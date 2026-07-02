@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "959449010935",
+    "project_id": "zapbairro-bc003",
+    "storage_bucket": "zapbairro-bc003.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959449010935:android:dbdde3ee8e79f40af279f2",
+        "android_client_info": {
+          "package_name": "com.zapbairro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCul3j165diuNfGwFNVndy4Vz5nZcdw7AI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
