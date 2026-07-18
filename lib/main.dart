@@ -4,6 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// Senha de acesso ao painel administrativo (área oculta).
+// >>> TROQUE por uma senha sua. <<<
+// Observação: por ficar dentro do app, é uma proteção simples (não use dados
+// sensíveis aqui). Serve para esconder o painel de visitas de usuários comuns.
+const String kAdminSenha = "zapadmin2024";
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -49,6 +55,55 @@ class ZapBairroApp extends StatelessWidget {
 class TelaCategorias extends StatelessWidget {
   const TelaCategorias({super.key});
 
+  // Gesto oculto: toque longo no título abre o portão do painel admin.
+  void _abrirPortaoAdmin(BuildContext context) {
+    final senhaController = TextEditingController();
+
+    void validar(BuildContext dialogContext) {
+      if (senhaController.text == kAdminSenha) {
+        Navigator.pop(dialogContext); // fecha o diálogo
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TelaAdmin()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Senha incorreta'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Área Restrita'),
+        content: TextField(
+          controller: senhaController,
+          obscureText: true,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Senha de administrador',
+            prefixIcon: Icon(Icons.lock),
+          ),
+          onSubmitted: (_) => validar(dialogContext),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => validar(dialogContext),
+            child: const Text('Entrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> categories = [
@@ -88,9 +143,12 @@ class TelaCategorias extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'ZapBairro',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        title: GestureDetector(
+          onLongPress: () => _abrirPortaoAdmin(context),
+          child: const Text(
+            'ZapBairro',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
         ),
         backgroundColor: Colors.green[700],
         centerTitle: true,
@@ -413,8 +471,10 @@ class TelaComercios extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            TelaDetalhes(dadosComercio: dados),
+                        builder: (context) => TelaDetalhes(
+                          dadosComercio: dados,
+                          comercioId: listaComercios[index].id,
+                        ),
                       ),
                     );
                   },
@@ -429,12 +489,43 @@ class TelaComercios extends StatelessWidget {
 }
 
 // --- TELA 3: DETALHES DO COMÉRCIO ---
-class TelaDetalhes extends StatelessWidget {
+class TelaDetalhes extends StatefulWidget {
   final Map<String, dynamic> dadosComercio;
-  const TelaDetalhes({super.key, required this.dadosComercio});
+  final String? comercioId;
+  const TelaDetalhes({
+    super.key,
+    required this.dadosComercio,
+    this.comercioId,
+  });
+
+  @override
+  State<TelaDetalhes> createState() => _TelaDetalhesState();
+}
+
+class _TelaDetalhesState extends State<TelaDetalhes> {
+  @override
+  void initState() {
+    super.initState();
+    _registrarVisita();
+  }
+
+  // Conta +1 visita neste estabelecimento sempre que os detalhes são abertos.
+  void _registrarVisita() async {
+    final id = widget.comercioId;
+    if (id == null || id.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('comercios')
+          .doc(id)
+          .update({'visitas': FieldValue.increment(1)});
+    } catch (e) {
+      debugPrint('Não foi possível registrar a visita: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final dadosComercio = widget.dadosComercio;
     final nome = dadosComercio['nome'] ?? 'Sem nome';
     final descricao = dadosComercio['descricao'] ?? 'Sem descrição';
     final endereco = dadosComercio['endereco'] ?? 'Endereço não informado';
@@ -572,11 +663,136 @@ class TelaDetalhes extends StatelessWidget {
 
 void abrirWhatsApp(String telefone) async {
   String numeroLimpo = telefone.replaceAll(RegExp(r'[^0-9]'), '');
-  Uri whatsappUrl = Uri.parse("https://wa.me/55$numeroLimpo");
+  const String mensagem = "Olá! Vim pelo aplicativo ZapBairro.";
+  Uri whatsappUrl = Uri.https("wa.me", "/55$numeroLimpo", {"text": mensagem});
 
   if (await canLaunchUrl(whatsappUrl)) {
     await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
   } else {
     debugPrint("Não foi possível abrir o WhatsApp");
+  }
+}
+
+// --- TELA ADMIN: CONTADOR DE VISITAS (ACESSO RESTRITO) ---
+class TelaAdmin extends StatelessWidget {
+  const TelaAdmin({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Painel Admin • Visitas',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.green[900],
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('comercios').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text('Nenhum estabelecimento cadastrado.'),
+            );
+          }
+
+          // Agrega visitas por nome (soma documentos duplicados com o mesmo nome).
+          final Map<String, int> visitasPorNome = {};
+          for (final doc in snapshot.data!.docs) {
+            final dados = doc.data() as Map<String, dynamic>;
+            final nome = (dados['nome'] ?? 'Sem nome').toString().trim();
+            if (nome.isEmpty) continue;
+            final rawVisitas = dados['visitas'];
+            final int visitas = rawVisitas is num ? rawVisitas.toInt() : 0;
+            visitasPorNome[nome] = (visitasPorNome[nome] ?? 0) + visitas;
+          }
+
+          final ranking = visitasPorNome.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+
+          final totalVisitas = ranking.fold<int>(
+            0,
+            (soma, e) => soma + e.value,
+          );
+
+          return Column(
+            children: [
+              Container(
+                width: double.infinity,
+                color: Colors.green[50],
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(
+                  children: [
+                    Text(
+                      '$totalVisitas',
+                      style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[900],
+                      ),
+                    ),
+                    const Text('Total de visitas registradas'),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${ranking.length} estabelecimentos',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: ranking.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final item = ranking[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: index < 3
+                            ? Colors.green[700]
+                            : Colors.grey[400],
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        item.key,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.visibility,
+                            size: 18,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${item.value}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

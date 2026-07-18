@@ -24,8 +24,8 @@ android {
         applicationId = "com.zapbairro.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 3
-        versionName = "3"
+        versionCode = 4
+        versionName = "4"
     }
 
     // Novo DSL para Kotlin
@@ -51,7 +51,7 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             // Assina com a chave de release quando key.properties existir;
-            // caso contrário usa a chave de debug para permitir o build.
+            // caso contrário usa a chave de debug para permitir builds locais.
             signingConfig = if (hasKeystore) {
                 signingConfigs.getByName("release")
             } else {
