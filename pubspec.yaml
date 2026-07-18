@@ -37,6 +37,7 @@ dependencies:
   cloud_firestore: ^6.4.1
   url_launcher: ^6.3.2
   firedart: ^0.9.8
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
