@@ -1039,6 +1039,7 @@ Future<void> mostrarCadastroMorador(BuildContext context) async {
             title: const Text('Bem-vindo ao ZapBairro!'),
             content: Form(
               key: formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1064,7 +1065,9 @@ Future<void> mostrarCadastroMorador(BuildContext context) async {
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
                       labelText: 'WhatsApp (com DDD)',
-                      hintText: '(91) 98555-4004',
+                      hintText: 'Ex.: 91 98555 4004',
+                      hintStyle: TextStyle(color: Colors.black26),
+                      helperText: 'Digite DDD + número (só números)',
                       prefixIcon: Icon(Icons.phone),
                     ),
                     validator: (v) {
