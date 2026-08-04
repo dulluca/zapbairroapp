@@ -24,8 +24,8 @@ android {
         applicationId = "com.zapbairro.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 4
-        versionName = "4"
+        versionCode = 5
+        versionName = "5"
     }
 
     // Novo DSL para Kotlin
