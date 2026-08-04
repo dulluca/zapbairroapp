@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Credenciais de assinatura iOS - nunca commitar (ficam em GitHub Secrets)
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+*.mobileprovision
+
+# fastlane
+ios/fastlane/certs/
+ios/fastlane/profiles/
+ios/fastlane/report.xml
+ios/fastlane/README.md
+ios/fastlane/test_output/

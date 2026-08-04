@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+# Sem pin de versao: o Gemfile.lock gerado no primeiro build (macOS) e quem
+# congela as versoes. Commite o Gemfile.lock se quiser builds 100% reproduziveis.
+gem "fastlane"
+gem "cocoapods"

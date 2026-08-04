@@ -59,6 +59,10 @@ flutter_launcher_icons:
   ios: true
   image_path: "logo.png"
   min_sdk_android: 21
+  # A App Store rejeita icone com canal alpha (erro ITMS-90717). Achata sobre
+  # branco, que e a cor de fundo do proprio logo.
+  remove_alpha_ios: true
+  background_color_ios: "#ffffff"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
