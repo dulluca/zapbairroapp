@@ -532,6 +532,13 @@ O `Podfile` foi removido. Se voce viu esse erro, puxe a correcao para a `main` e
 rode o build de novo — nao precisa refazer nada do lado da Apple, nem dos
 secrets.
 
+### "does not support provisioning profiles" em varios pacotes
+
+Bug do pipeline, ja corrigido. A assinatura era passada na linha de comando do
+`xcodebuild`, o que atingia os 60+ alvos de Swift Package do Firebase e
+companhia, alem de embaralhar o nome do certificado. Agora ela e gravada so no
+target `Runner`. Puxe a correcao para a `main` e rode o build de novo.
+
 ### A Apple recusa o build por versao repetida
 
 Cada envio precisa de um build number maior que o anterior. O workflow usa o

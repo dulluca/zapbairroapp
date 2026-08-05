@@ -99,6 +99,19 @@ O secret `IOS_DIST_CERT_P12` esta vazio, truncado ou com a senha errada em
 Voce registrou o app iOS no Firebase com outro Bundle ID. Registre de novo com
 `com.zapbairro.zapbairro` e baixe o plist novamente.
 
+**`<algum pacote> does not support provisioning profiles`**
+Alguem voltou a passar `PROVISIONING_PROFILE_SPECIFIER` (ou outra chave de
+assinatura) via `xcargs` no [Fastfile](../ios/fastlane/Fastfile). `xcargs` valem
+para **todos** os alvos do build, e os plugins entram como Swift Packages — sao
+60+ alvos que nao aceitam profile. A assinatura tem que ser gravada so no target
+`Runner`, com `update_code_signing_settings`.
+
+**`No certificate ... matching 'iphoneos*]=Apple Distribution' found`**
+Mesma origem: alguem passou `CODE_SIGN_IDENTITY[sdk=iphoneos*]=...` por `xcargs`.
+O `xcodebuild` de linha de comando nao entende a sintaxe condicional — corta no
+primeiro `=` e adota o resto como nome da identidade. Essa variante so pode ser
+escrita dentro do projeto, nunca na linha de comando.
+
 **`The provisioning profile does not include the signing certificate`**
 Acontece se o certificado foi recriado depois do profile. Revogue o profile em
 <https://developer.apple.com/account/resources/profiles/list> — o proximo build

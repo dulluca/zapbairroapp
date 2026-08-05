@@ -29,6 +29,10 @@ def workspace_path
   dir_env("IOS_PROJECT_DIR", ".") + "/Runner.xcworkspace"
 end
 
+def xcodeproj_path
+  dir_env("IOS_PROJECT_DIR", ".") + "/Runner.xcodeproj"
+end
+
 # Le uma variavel de ambiente obrigatoria e falha com mensagem util quando falta,
 # em vez do KeyError cru do ENV.fetch.
 def env!(nome, dica)
@@ -146,6 +150,34 @@ platform :ios do
     nome_profile = lane_context[SharedValues::SIGH_NAME]
     UI.message("Provisioning profile em uso: #{nome_profile}")
 
+    # A assinatura vai gravada no target Runner, nao em xcargs. Duas razoes:
+    #
+    # 1. xcargs valem para TODOS os alvos do build. Os plugins entram como Swift
+    #    Packages (Firebase, gRPC, leveldb, abseil...), sao 60+ alvos, e cada um
+    #    reclama "does not support provisioning profiles" ao ver um
+    #    PROVISIONING_PROFILE_SPECIFIER.
+    # 2. O xcodebuild na linha de comando nao entende a sintaxe condicional
+    #    `CODE_SIGN_IDENTITY[sdk=iphoneos*]=...`: ele corta no primeiro `=` e
+    #    adota `iphoneos*]=Apple Distribution` como nome da identidade.
+    #
+    # A variante [sdk=iphoneos*] precisa ser escrita mesmo assim, porque o
+    # template do Flutter deixa `"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone
+    # Developer"` no nivel do projeto. Gravada no target, ela vence — mesma
+    # chave, escopo mais especifico.
+    [nil, "iphoneos*"].each do |sdk|
+      update_code_signing_settings(
+        path: xcodeproj_path,
+        use_automatic_signing: false,
+        team_id: time,
+        targets: ["Runner"],
+        build_configurations: ["Release"],
+        code_sign_identity: "Apple Distribution",
+        profile_name: nome_profile,
+        bundle_identifier: bundle_id,
+        sdk: sdk
+      )
+    end
+
     build_app(
       workspace: workspace_path,
       scheme: "Runner",
@@ -161,17 +193,7 @@ platform :ios do
         provisioningProfiles: { bundle_id => nome_profile },
         uploadSymbols: true,
         manageAppVersionAndBuildNumber: false
-      },
-      # Assinatura manual explicita. Precisa sobrescrever tambem a variante
-      # condicional [sdk=iphoneos*], que o template do Flutter deixa como
-      # "iPhone Developer" e venceria um CODE_SIGN_IDENTITY simples.
-      xcargs: [
-        "CODE_SIGN_STYLE=Manual",
-        "DEVELOPMENT_TEAM=#{time}",
-        "PROVISIONING_PROFILE_SPECIFIER='#{nome_profile}'",
-        "CODE_SIGN_IDENTITY='Apple Distribution'",
-        "'CODE_SIGN_IDENTITY[sdk=iphoneos*]=Apple Distribution'"
-      ].join(" ")
+      }
     )
 
     UI.success("IPA gerado em #{lane_context[SharedValues::IPA_OUTPUT_PATH]}")
