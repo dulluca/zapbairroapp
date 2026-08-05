@@ -253,6 +253,21 @@ git push origin main
 
 ## Parte 8 — Criar o certificado (uma vez só na vida)
 
+> ⚠️ **Se voce ja rodou este workflow e ele falhou**, faca a limpeza abaixo antes
+> de rodar de novo — senao a nova execucao gasta uma segunda vaga de certificado
+> na conta Apple e deixa a primeira ocupada para sempre.
+>
+> Um bootstrap que falha *depois* do passo "Criar certificado e provisioning
+> profile" ja criou o certificado do lado da Apple. Mas a chave privada dele
+> ficou no runner, que a Apple/GitHub destroi ao fim do job — ou seja, aquele
+> certificado nasceu inutilizavel e so ocupa espaco.
+>
+> - [ ] Abrir <https://developer.apple.com/account/resources/certificates/list>
+> - [ ] Localizar o certificado **Apple Distribution** criado na hora do run que
+>       falhou (o ID aparece no log, na linha `Certificado gerado pelo fastlane`)
+> - [ ] Clicar nele → **Revoke** → confirmar
+> - [ ] So entao seguir com os passos abaixo
+
 **Onde:** <https://github.com/dulluca/zapbairroapp/actions>
 
 - [ ] Na lista da esquerda, clicar em **iOS - Bootstrap de assinatura (rodar uma vez)**
@@ -488,6 +503,17 @@ atualize o secret `GOOGLE_SERVICE_INFO_PLIST`.
 O secret `IOS_DIST_CERT_P12` veio truncado, ou o `IOS_DIST_CERT_PASSWORD` nao
 confere. Abra o `IOS_DIST_CERT_P12.base64.txt` de novo, copie **tudo**
 (`Ctrl+A`), e atualize o secret.
+
+### "Nao foi possivel ler o .p12 gerado pelo fastlane"
+
+Bug do pipeline, ja corrigido. O passo que empacotava o certificado assumia que o
+arquivo `<ID>.p12` do fastlane era um PKCS#12, quando na verdade ele guarda so a
+chave privada — o certificado sai separado, num `.cer`.
+
+Se voce viu esse erro, o certificado **chegou a ser criado** na conta Apple.
+Revogue ele antes de rodar de novo, seguindo o aviso no inicio da
+[Parte 8](#parte-8--criar-o-certificado-uma-vez-só-na-vida). Depois puxe a
+correcao para a `main` e rode o bootstrap outra vez.
 
 ### O bootstrap falha com erro de permissao
 
