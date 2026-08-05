@@ -22,10 +22,9 @@ Parte 5  Firebase               registrar o app iOS
 Parte 6  GitHub                 cadastrar 6 secrets
 Parte 7  GitHub                 juntar o branch na main
 Parte 8  GitHub Actions         rodar o bootstrap (1x) + 1 secret
-Parte 9  GitHub Actions         rodar o build -> sai o .ipa
+Parte 9  GitHub Actions         rodar o build -> vai sozinho para o TestFlight
 Parte 10 App Store Connect      criar o app e preencher a ficha
-Parte 11 App Store Connect      enviar o build
-Parte 12 App Store Connect      submeter para revisao
+Parte 11 App Store Connect      submeter para revisao
 ```
 
 Valores que vao se repetir o tempo todo:
@@ -314,24 +313,34 @@ Dentro tem:
 
 ---
 
-## Parte 9 — Gerar o .ipa
+## Parte 9 — Gerar o .ipa e entregar no TestFlight
 
 **Onde:** <https://github.com/dulluca/zapbairroapp/actions>
 
+⚠️ **Antes de rodar:** o app precisa ja existir no App Store Connect. Se ainda
+nao criou, faca agora os primeiros passos da [Parte 10](#parte-10--criar-o-app-no-app-store-connect)
+(so o **+ → Novo app**; a ficha pode ser preenchida depois). Sem isso o build
+compila normalmente, mas a entrega no fim falha por nao achar o app.
+
 - [ ] Clicar em **iOS - Build IPA (App Store)**
 - [ ] **Run workflow**
-- [ ] Deixar os dois campos vazios (usa `1.0.0` do pubspec e o numero do run
-      como build number)
+- [ ] Deixar os dois campos de texto vazios (usa `1.0.0` do pubspec e o numero
+      do run como build number)
+- [ ] Deixar **Entregar o build no TestFlight** marcado
 - [ ] **Run workflow** verde
 
 Demora **15 a 25 minutos** na primeira vez (o Firestore e grande de compilar).
 Nas proximas fica mais rapido por causa do cache.
 
-- [ ] Terminou com ✅ → abrir o run → secao **Artifacts** → baixar
+- [ ] Terminou com ✅ → o build ja foi entregue a Apple, nao ha nada para enviar
+      a mao
+- [ ] Opcional: abrir o run → secao **Artifacts** → baixar
       **ZapBairro-ios-\<numero\>**
 
-Dentro tem o `ZapBairro.ipa` (o app) e o `.dSYM.zip` (simbolos, uteis para
-decifrar relatorios de crash mais tarde).
+O artefato guarda o `ZapBairro.ipa` (o app) e o `.dSYM.zip` (simbolos, uteis
+para decifrar relatorios de crash mais tarde). O upload para a Apple acontece
+**depois** de o artefato ser salvo, entao mesmo que a entrega falhe o `.ipa`
+continua disponivel para reenvio.
 
 🎉 **A parte tecnica acabou aqui.** Da Parte 10 em diante e preenchimento de
 ficha na Apple.
@@ -428,42 +437,28 @@ O app grava contagem de visitas por loja no Firestore. Responda com honestidade:
 
 ---
 
-## Parte 11 — Enviar o build para a Apple
+## Parte 11 — Submeter para revisão
 
-⚠️ **Leia antes de comecar:** o `.ipa` que voce baixou na Parte 9 precisa ser
-enviado com o **Transporter**, que **só existe para macOS**. Como voce trabalha
-no Windows, existem dois caminhos:
+**Onde:** pagina do app → **Distribuição da App Store** → versao `1.0.0`
 
-### Caminho A — Ligar o envio automatico (recomendado)
+Primeiro, confirmar que o build da Parte 9 chegou:
 
-O proprio GitHub Actions manda o build direto para a Apple, e voce nunca precisa
-de um Mac. E uma alteracao pequena no pipeline, e toda a autenticacao ja esta
-configurada (a API Key da Parte 3 serve para isso tambem).
-
-**Me peca para ativar o envio automatico** — depois disso, cada execucao do
-workflow entrega o build no TestFlight sozinha, e a Parte 11 deixa de existir.
-
-### Caminho B — Alguem com Mac envia por voce
-
-- [ ] Passe o `.ipa` para alguem que tenha um Mac
-- [ ] Essa pessoa instala o **Transporter** (gratis, na Mac App Store)
-- [ ] Faz login com a sua conta Apple
-- [ ] Arrasta o `.ipa` para a janela e clica em **Deliver**
-
-### Depois do envio (nos dois caminhos)
-
-- [ ] Esperar de 5 a 30 minutos — a Apple processa o build
+- [ ] Esperar de 5 a 30 minutos depois do run — a Apple processa o build
 - [ ] Conferir em App Store Connect → seu app → **TestFlight** se o build
       aparece com status *Pronto para testar*
 
 Se chegar um e-mail da Apple apontando erro, o build foi recusado no
 processamento e nao vai aparecer. O e-mail diz o motivo.
 
----
+Com o build disponivel:
 
-## Parte 12 — Submeter para revisão
+- [ ] Preencher os campos da versao:
 
-**Onde:** pagina do app → **Distribuição da App Store** → versao `1.0.0`
+| Campo | Valor |
+| --- | --- |
+| Versão | `1.0.0` — tem que ser identico ao do build, que sai do `version:` do `pubspec.yaml` |
+| Copyright | ano + titular dos direitos, sem `©` nem URL. Ex.: `2026 Fulano de Tal` |
+| Arquivo de cobertura do app de roteamento | deixar **vazio** — so vale para app de navegacao ponto a ponto |
 
 - [ ] Na secao **Build**, clicar em **+** e selecionar o build enviado
 - [ ] Preencher **Informações de revisão**:
@@ -544,6 +539,28 @@ target `Runner`. Puxe a correcao para a `main` e rode o build de novo.
 Cada envio precisa de um build number maior que o anterior. O workflow usa o
 numero do run automaticamente, entao isso so acontece se voce preencher o campo
 `build_number` na mao com um valor ja usado. Deixe vazio.
+
+### O passo "Entregar o build no TestFlight" falha
+
+O `.ipa` **nao se perde**: esse passo roda depois do upload do artefato, entao o
+binario ja esta salvo no run. Causas em ordem de frequencia:
+
+1. **O app nao existe no App Store Connect.** Faca o **+ → Novo app** da
+   [Parte 10](#parte-10--criar-o-app-no-app-store-connect) e rode o workflow de
+   novo — ele recompila, mas nada precisa ser refeito na Apple.
+2. **Build number repetido.** Veja o item acima.
+3. **Instabilidade da Apple.** Basta rodar o workflow de novo.
+
+Para rodar so o build, sem tentar entregar, desmarque **Entregar o build no
+TestFlight** no formulario do *Run workflow*.
+
+### Preciso enviar o `.ipa` a mao
+
+Nao deveria ser necessario — o workflow entrega sozinho. Se um dia precisar, o
+envio manual exige o **Transporter**, que so existe para macOS: passe o `.ipa`
+do artefato para alguem com Mac, essa pessoa instala o Transporter (gratis, na
+Mac App Store), faz login com a sua conta Apple, arrasta o arquivo e clica em
+**Deliver**.
 
 ### Qualquer outro erro no workflow
 

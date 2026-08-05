@@ -14,7 +14,7 @@ quando algo quebra.
 | Workflow | Quando rodar | O que faz |
 | --- | --- | --- |
 | `iOS - Bootstrap de assinatura` | **uma unica vez** | Cria o certificado Apple Distribution e devolve o `.p12` |
-| `iOS - Build IPA (App Store)` | a cada release | Compila, assina e publica o `.ipa` como artefato |
+| `iOS - Build IPA (App Store)` | a cada release | Compila, assina, publica o `.ipa` como artefato e entrega no TestFlight |
 
 O bootstrap e separado de proposito: a Apple limita a **poucos certificados de
 distribuicao por conta**. Se o build criasse um certificado novo a cada execucao,
@@ -23,21 +23,31 @@ guardado como secret, e reutilizado sempre.
 
 ---
 
-## Automatizar o upload (opcional)
+## Envio automatico para o TestFlight
 
-Como a API Key ja esta configurada, ativar o envio automatico e barato. Basta
-acrescentar ao final da lane `build_ipa` no [ios/fastlane/Fastfile](../ios/fastlane/Fastfile):
+Ativo. A mesma API Key que assina o build tambem autentica o upload, entao o
+Transporter — e portanto um Mac — nao e necessario em momento algum.
 
-```ruby
-upload_to_testflight(
-  api_key: chave,
-  skip_waiting_for_build_processing: true,
-  distribute_external: false
-)
-```
+A entrega mora na lane `upload_testflight` do
+[ios/fastlane/Fastfile](../ios/fastlane/Fastfile), chamada por um passo proprio
+do workflow. Tres decisoes valem registro:
 
-Feito isso, cada run manda o build direto para o TestFlight e o Transporter
-deixa de ser necessario.
+- **Lane separada da `build_ipa`, e passo posterior ao `upload-artifact`.**
+  Quando o upload roda, o `.ipa` ja esta salvo no run. Falha na entrega (app
+  ainda nao criado no App Store Connect, build number repetido, instabilidade
+  da Apple) nao obriga a recompilar do zero.
+- **`skip_waiting_for_build_processing: true`.** A Apple leva de 5 a 30 minutos
+  processando, e o runner macOS e cobrado a 10x o minuto. O status se acompanha
+  na aba TestFlight, de graca.
+- **`skip_submission: true` + `distribute_external: false`.** O pipeline entrega
+  o binario e para ai. Distribuir para testadores e submeter para revisao
+  continuam sendo decisao manual no site.
+
+Para gerar o `.ipa` sem entregar, desmarque **Entregar o build no TestFlight**
+no formulario do *Run workflow*. Em push de tag `v*` a entrega e sempre feita.
+
+> O upload exige que o app **ja exista** no App Store Connect. E a unica ordem
+> que o pipeline nao consegue garantir sozinho.
 
 ---
 

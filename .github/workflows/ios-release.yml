@@ -1,10 +1,11 @@
 name: iOS - Build IPA (App Store)
 
-# Gera o .ipa assinado para a App Store e publica como artefato do run.
-# O upload para o App Store Connect e feito manualmente (Transporter) por enquanto.
+# Gera o .ipa assinado, publica como artefato do run e entrega no TestFlight.
+# Nenhum Mac e necessario: a API Key do App Store Connect faz o upload.
 #
 # Antes do primeiro uso, rode o workflow "iOS - Bootstrap de assinatura" uma vez
-# e cadastre os secrets descritos em docs/IOS_DEPLOY.md.
+# e cadastre os secrets descritos em docs/IOS_DEPLOY.md. O app tambem precisa ja
+# existir no App Store Connect, senao o upload nao encontra onde entregar.
 
 on:
   workflow_dispatch:
@@ -17,6 +18,11 @@ on:
         description: "Build number. Vazio = usa o numero do run (sempre crescente)"
         required: false
         default: ""
+      enviar_para_testflight:
+        description: "Entregar o build no TestFlight ao final"
+        type: boolean
+        required: false
+        default: true
   push:
     tags:
       - "v*"
@@ -197,6 +203,18 @@ jobs:
             build/ios/ipa/*.app.dSYM.zip
           if-no-files-found: error
           retention-days: 30
+
+      # Depois do upload do artefato de proposito: se a entrega na Apple falhar,
+      # o .ipa ja esta salvo no run e da para reenviar sem recompilar.
+      # Em push de tag `inputs` vem vazio, entao a primeira clausula liga o envio.
+      - name: Entregar o build no TestFlight
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.enviar_para_testflight }}
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: bundle exec fastlane ios upload_testflight
 
       - name: Publicar logs de build (em caso de falha)
         if: failure()
