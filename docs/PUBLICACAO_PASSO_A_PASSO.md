@@ -521,6 +521,17 @@ A conta Apple nao tem papel suficiente, ou a API Key foi criada com Access menor
 que **App Manager**. Confira na Parte 3 — se estiver errado, revogue a chave e
 crie outra.
 
+### "The sandbox is not in sync with the Podfile.lock"
+
+Bug do projeto, ja corrigido. Sobrou um `ios/Podfile` de um setup antigo, e ele
+fazia o Flutter integrar o CocoaPods num projeto que hoje usa Swift Package
+Manager. O `pod install` terminava em 1,5 segundo sem instalar nada, mas deixava
+para tras uma verificacao que derrubava o Xcode.
+
+O `Podfile` foi removido. Se voce viu esse erro, puxe a correcao para a `main` e
+rode o build de novo — nao precisa refazer nada do lado da Apple, nem dos
+secrets.
+
 ### A Apple recusa o build por versao repetida
 
 Cada envio precisa de um build number maior que o anterior. O workflow usa o

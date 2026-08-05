@@ -52,7 +52,7 @@ Para o build iOS ser aceitavel pela Apple, o repositorio recebeu:
 | `ios/Runner.xcodeproj/project.pbxproj` | `GoogleService-Info.plist` adicionado aos *Resources* do target Runner | Sem isso o arquivo nao entra no `.app` |
 | `ios/Runner/Info.plist` | Nome de exibicao `Zapbairro Fix` → `ZapBairro` | E o nome que aparece embaixo do icone |
 | `ios/Runner/Info.plist` | `ITSAppUsesNonExemptEncryption = false` | Evita o questionario de exportacao a cada envio |
-| `ios/Podfile` | criado, com `platform :ios, '15.0'` | Alinha os pods com o deployment target |
+| `ios/Podfile` | **removido** | Os plugins deste app sao Swift Packages; um Podfile presente integra CocoaPods num projeto sem pods e quebra o build |
 | `pubspec.yaml` | `remove_alpha_ios: true` + icones regerados | A Apple rejeita icone com canal alpha (`ITMS-90717`) |
 | `logo.png` | trocado por uma arte 1024×1024 sem marca d'agua | O anterior era 512×512 com marca d'agua "turbologo", ampliado para 1024 |
 | `.gitignore` | ignora `*.p12`, `*.p8`, `*.cer`, `*.mobileprovision` | Evita commit acidental de credencial |
@@ -104,9 +104,19 @@ Acontece se o certificado foi recriado depois do profile. Revogue o profile em
 <https://developer.apple.com/account/resources/profiles/list> — o proximo build
 gera um novo automaticamente.
 
-**Build falha no CocoaPods com erro de deployment target**
-Confira se `ios/Podfile` (`platform :ios, '15.0'`) e o `IPHONEOS_DEPLOYMENT_TARGET`
-do `project.pbxproj` continuam iguais. Os dois precisam andar juntos.
+**`The sandbox is not in sync with the Podfile.lock`**
+Alguem recriou o `ios/Podfile`. Este projeto nao usa CocoaPods: os plugins entram
+como Swift Packages (`packageReferences` no `Runner.xcodeproj`) e o `pod install`
+disparado pelo Podfile injeta a fase `[CP] Check Pods Manifest.lock` num projeto
+que nao tem pods. Apague o `ios/Podfile` — o workflow tem uma verificacao que
+falha de proposito se ele reaparecer.
+
+**Um plugin novo exige CocoaPods**
+Se o `flutter build ios` reclamar que algum plugin nao tem Swift Package, o
+projeto precisa voltar para CocoaPods **por inteiro**: recrie o `Podfile` com
+`platform :ios, '15.0'` (igual ao `IPHONEOS_DEPLOYMENT_TARGET`), devolva
+`gem "cocoapods"` ao `ios/Gemfile` e remova as `packageReferences` de Swift
+Package do `project.pbxproj`. Meio-termo entre os dois nao funciona.
 
 **Apple recusa o build por versao/numero repetido**
 Cada envio precisa de um `build_number` maior que o anterior *para a mesma

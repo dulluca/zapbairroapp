@@ -84,7 +84,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Instalar Ruby e gems (fastlane / cocoapods)
+      - name: Instalar Ruby e gems (fastlane)
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
@@ -155,9 +155,25 @@ jobs:
           echo "BUILD_NAME=$nome" >> "$GITHUB_ENV"
           echo "Build number: $numero / version: ${nome:-<pubspec>}"
 
-      - name: Compilar Flutter e instalar pods
+      - name: Compilar o app Flutter
         run: |
           set -euo pipefail
+
+          # Os plugins deste app entram como Swift Packages. Se um Podfile
+          # reaparecer, o `flutter build ios` integra CocoaPods num projeto que
+          # nao usa pods e o xcodebuild falha em "The sandbox is not in sync
+          # with the Podfile.lock" — melhor barrar aqui, com a causa na tela.
+          if [ -f ios/Podfile ]; then
+            echo "::error::ios/Podfile voltou a existir. Este projeto usa Swift Package Manager (ver packageReferences no Runner.xcodeproj); apague o Podfile ou migre o projeto de volta para CocoaPods por inteiro."
+            exit 1
+          fi
+
+          # Explicito para nao depender do padrao da versao do Flutter: o
+          # Runner.xcodeproj referencia o pacote gerado em
+          # Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage, que
+          # so e criado com o SPM ligado.
+          flutter config --enable-swift-package-manager
+
           args="--release --no-codesign --build-number=$BUILD_NUMBER"
           if [ -n "${BUILD_NAME:-}" ]; then args="$args --build-name=$BUILD_NAME"; fi
           flutter build ios $args
