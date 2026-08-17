@@ -1,0 +1,228 @@
+default_platform(:ios)
+
+KEYCHAIN_NAME = "zapbairro-ci".freeze
+
+# Todos os caminhos chegam prontos do workflow, em absoluto. O diretorio de
+# trabalho do fastlane (a pasta que contem `fastlane/`) nao e obvio o suficiente
+# para se confiar em caminho relativo aqui.
+def dir_env(nome, padrao)
+  File.expand_path(ENV[nome] || padrao, Dir.pwd)
+end
+
+def certs_dir
+  dir_env("IOS_CERTS_DIR", "fastlane/certs")
+end
+
+def profiles_dir
+  dir_env("IOS_PROFILES_DIR", "fastlane/profiles")
+end
+
+def ipa_dir
+  dir_env("IOS_IPA_DIR", "../build/ios/ipa")
+end
+
+def logs_dir
+  dir_env("IOS_LOGS_DIR", "../build/ios/logs")
+end
+
+def workspace_path
+  dir_env("IOS_PROJECT_DIR", ".") + "/Runner.xcworkspace"
+end
+
+def xcodeproj_path
+  dir_env("IOS_PROJECT_DIR", ".") + "/Runner.xcodeproj"
+end
+
+# Le uma variavel de ambiente obrigatoria e falha com mensagem util quando falta,
+# em vez do KeyError cru do ENV.fetch.
+def env!(nome, dica)
+  valor = ENV[nome]
+  UI.user_error!("Variavel #{nome} nao definida. #{dica}") if valor.nil? || valor.strip.empty?
+  valor
+end
+
+def bundle_id
+  ENV["IOS_BUNDLE_ID"] || "com.zapbairro.zapbairro"
+end
+
+def asc_api_key
+  app_store_connect_api_key(
+    key_id: env!("ASC_KEY_ID", "Secret APPSTORE_KEY_ID (Key ID da API Key do App Store Connect)."),
+    issuer_id: env!("ASC_ISSUER_ID", "Secret APPSTORE_ISSUER_ID (Issuer ID do App Store Connect)."),
+    key_content: env!("ASC_KEY_CONTENT", "Secret APPSTORE_PRIVATE_KEY (conteudo do .p8 em base64)."),
+    is_key_content_base64: true,
+    in_house: false
+  )
+end
+
+# Keychain temporaria e descartavel, exclusiva do runner.
+def criar_keychain_ci!
+  create_keychain(
+    name: KEYCHAIN_NAME,
+    password: env!("KEYCHAIN_PASSWORD", "Definida pelo proprio workflow."),
+    default_keychain: true,
+    unlock: true,
+    timeout: 3600,
+    lock_when_sleeps: false,
+    add_to_search_list: true
+  )
+end
+
+# O macOS decide o sufixo do arquivo da keychain (`-db`, `.keychain-db`...), e
+# isso ja mudou entre versoes. Descobrir na hora evita quebrar em outro runner.
+def caminho_keychain!
+  base = File.expand_path("~/Library/Keychains")
+  candidatos = [
+    "#{base}/#{KEYCHAIN_NAME}-db",
+    "#{base}/#{KEYCHAIN_NAME}.keychain-db",
+    "#{base}/#{KEYCHAIN_NAME}.keychain",
+    "#{base}/#{KEYCHAIN_NAME}"
+  ]
+  encontrado = candidatos.find { |c| File.exist?(c) }
+  if encontrado.nil?
+    UI.user_error!("Keychain '#{KEYCHAIN_NAME}' nao encontrada em #{base}. Existentes: #{Dir.glob("#{base}/*").join(', ')}")
+  end
+  encontrado
+end
+
+platform :ios do
+  # ---------------------------------------------------------------------------
+  # Rodar UMA VEZ. Cria o certificado Apple Distribution na conta e exporta o
+  # .p12 para virar secret. A Apple limita a poucos certificados de distribuicao
+  # por conta, entao esta lane NAO pode fazer parte do build de todo dia.
+  # ---------------------------------------------------------------------------
+  desc "Cria o certificado de distribuicao e o provisioning profile (executar uma unica vez)"
+  lane :bootstrap_signing do
+    criar_keychain_ci!
+    chave = asc_api_key
+    time = env!("APPLE_TEAM_ID", "Secret APPLE_TEAM_ID (10 caracteres, visto em developer.apple.com > Membership).")
+
+    cert(
+      api_key: chave,
+      development: false,
+      generate_apple_certs: true,
+      team_id: time,
+      keychain_path: caminho_keychain!,
+      keychain_password: env!("KEYCHAIN_PASSWORD", "Definida pelo proprio workflow."),
+      output_path: certs_dir
+    )
+
+    sigh(
+      api_key: chave,
+      app_identifier: bundle_id,
+      team_id: time,
+      platform: "ios",
+      force: true,
+      output_path: profiles_dir
+    )
+
+    UI.success("Certificado em #{certs_dir} e profile em #{profiles_dir}.")
+  end
+
+  # ---------------------------------------------------------------------------
+  # Build de release. Importa o certificado ja existente (secret) e baixa/gera o
+  # provisioning profile pela API. Nao cria certificado novo.
+  # ---------------------------------------------------------------------------
+  desc "Compila e assina o .ipa para a App Store"
+  lane :build_ipa do
+    criar_keychain_ci!
+    chave = asc_api_key
+    time = env!("APPLE_TEAM_ID", "Secret APPLE_TEAM_ID.")
+
+    p12 = "#{certs_dir}/distribution.p12"
+    UI.user_error!("Certificado nao encontrado em #{p12}. O secret IOS_DIST_CERT_P12 esta vazio?") unless File.exist?(p12)
+
+    import_certificate(
+      certificate_path: p12,
+      certificate_password: env!("CERT_PASSWORD", "Secret IOS_DIST_CERT_PASSWORD (senha do .p12)."),
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: env!("KEYCHAIN_PASSWORD", "Definida pelo proprio workflow.")
+    )
+
+    sigh(
+      api_key: chave,
+      app_identifier: bundle_id,
+      team_id: time,
+      platform: "ios",
+      output_path: profiles_dir
+    )
+
+    nome_profile = lane_context[SharedValues::SIGH_NAME]
+    UI.message("Provisioning profile em uso: #{nome_profile}")
+
+    # A assinatura vai gravada no target Runner, nao em xcargs. Duas razoes:
+    #
+    # 1. xcargs valem para TODOS os alvos do build. Os plugins entram como Swift
+    #    Packages (Firebase, gRPC, leveldb, abseil...), sao 60+ alvos, e cada um
+    #    reclama "does not support provisioning profiles" ao ver um
+    #    PROVISIONING_PROFILE_SPECIFIER.
+    # 2. O xcodebuild na linha de comando nao entende a sintaxe condicional
+    #    `CODE_SIGN_IDENTITY[sdk=iphoneos*]=...`: ele corta no primeiro `=` e
+    #    adota `iphoneos*]=Apple Distribution` como nome da identidade.
+    #
+    # A variante [sdk=iphoneos*] precisa ser escrita mesmo assim, porque o
+    # template do Flutter deixa `"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone
+    # Developer"` no nivel do projeto. Gravada no target, ela vence — mesma
+    # chave, escopo mais especifico.
+    [nil, "iphoneos*"].each do |sdk|
+      update_code_signing_settings(
+        path: xcodeproj_path,
+        use_automatic_signing: false,
+        team_id: time,
+        targets: ["Runner"],
+        build_configurations: ["Release"],
+        code_sign_identity: "Apple Distribution",
+        profile_name: nome_profile,
+        bundle_identifier: bundle_id,
+        sdk: sdk
+      )
+    end
+
+    build_app(
+      workspace: workspace_path,
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: ipa_dir,
+      output_name: "ZapBairro.ipa",
+      buildlog_path: logs_dir,
+      export_team_id: time,
+      export_options: {
+        signingStyle: "manual",
+        teamID: time,
+        provisioningProfiles: { bundle_id => nome_profile },
+        uploadSymbols: true,
+        manageAppVersionAndBuildNumber: false
+      }
+    )
+
+    UI.success("IPA gerado em #{lane_context[SharedValues::IPA_OUTPUT_PATH]}")
+  end
+
+  # ---------------------------------------------------------------------------
+  # Entrega no TestFlight o .ipa que a lane build_ipa deixou em ipa_dir.
+  # Lane separada de proposito: quando ela roda, o artefato do run ja foi salvo,
+  # entao uma falha aqui (app ainda nao criado no App Store Connect, build
+  # number repetido, instabilidade da Apple) nao custa o .ipa.
+  # ---------------------------------------------------------------------------
+  desc "Envia para o TestFlight o .ipa gerado pela lane build_ipa"
+  lane :upload_testflight do
+    ipa = "#{ipa_dir}/ZapBairro.ipa"
+    UI.user_error!("IPA nao encontrado em #{ipa}. A lane build_ipa precisa rodar antes desta.") unless File.exist?(ipa)
+
+    upload_to_testflight(
+      api_key: asc_api_key,
+      app_identifier: bundle_id,
+      ipa: ipa,
+      # Sem esperar o processamento: a Apple leva de 5 a 30 minutos, e o runner
+      # macOS e cobrado a 10x o minuto. O status se acompanha na aba TestFlight.
+      skip_waiting_for_build_processing: true,
+      # Este pipeline so entrega o binario. Distribuir para testadores e
+      # submeter para revisao continuam sendo decisao manual no site.
+      skip_submission: true,
+      distribute_external: false
+    )
+
+    UI.success("Build entregue ao TestFlight. O processamento na Apple leva de 5 a 30 minutos.")
+  end
+end

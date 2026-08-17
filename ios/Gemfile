@@ -1,0 +1,9 @@
+source "https://rubygems.org"
+
+# Sem pin de versao: o Gemfile.lock gerado no primeiro build (macOS) e quem
+# congela as versoes. Commite o Gemfile.lock se quiser builds 100% reproduziveis.
+# Sem cocoapods de proposito: os plugins deste app entram como Swift Packages
+# (ver packageReferences no Runner.xcodeproj). Um Podfile presente faria o
+# `flutter build ios` integrar CocoaPods num projeto que nao usa pods, e o
+# xcodebuild morreria em "The sandbox is not in sync with the Podfile.lock".
+gem "fastlane"

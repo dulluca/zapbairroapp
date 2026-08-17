@@ -1,0 +1,187 @@
+name: iOS - Bootstrap de assinatura (rodar uma vez)
+
+# Cria o certificado "Apple Distribution" na conta Apple usando a App Store
+# Connect API Key e devolve o .p12 como artefato, para virar secret.
+#
+# ATENCAO: a Apple limita a poucos certificados de distribuicao por conta.
+# Rode este workflow UMA VEZ. Depois disso o build diario apenas importa o .p12
+# guardado no secret IOS_DIST_CERT_P12 e nunca cria certificado novo.
+#
+# Pre-requisito: o secret IOS_DIST_CERT_PASSWORD ja precisa existir (qualquer
+# senha forte escolhida por voce) - e com ela que o .p12 sera protegido.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacao:
+        description: 'Digite CRIAR para confirmar (consome uma vaga de certificado da conta Apple)'
+        required: true
+        default: ""
+
+env:
+  IOS_BUNDLE_ID: com.zapbairro.zapbairro
+  FASTLANE_SKIP_UPDATE_CHECK: "true"
+  FASTLANE_HIDE_CHANGELOG: "true"
+  IOS_PROJECT_DIR: ${{ github.workspace }}/ios
+  IOS_CERTS_DIR: ${{ github.workspace }}/ios/fastlane/certs
+  IOS_PROFILES_DIR: ${{ github.workspace }}/ios/fastlane/profiles
+
+jobs:
+  bootstrap:
+    name: Criar certificado e profile
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Validar confirmacao
+        run: |
+          if [ "${{ github.event.inputs.confirmacao }}" != "CRIAR" ]; then
+            echo "::error::Confirmacao invalida. Rode de novo digitando exatamente CRIAR."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Conferir se os secrets obrigatorios existem
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          faltando=""
+          for nome in APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY \
+                      APPLE_TEAM_ID IOS_DIST_CERT_PASSWORD; do
+            if [ -z "${!nome}" ]; then faltando="$faltando $nome"; fi
+          done
+          if [ -n "$faltando" ]; then
+            echo "::error::Secrets faltando:$faltando. Veja docs/IOS_DEPLOY.md."
+            exit 1
+          fi
+
+      - name: Instalar Ruby e gems (fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Gerar senha efemera da keychain
+        run: echo "KEYCHAIN_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+
+      - name: Criar certificado e provisioning profile
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: bundle exec fastlane ios bootstrap_signing
+
+      - name: Montar o distribution.p12 com a senha do secret
+        env:
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cd "$IOS_CERTS_DIR"
+          echo "Arquivos deixados pelo fastlane:"
+          ls -la
+
+          pem=$(mktemp)   # chave privada + certificado, os dois em PEM
+          ok=0
+
+          # Caso 1: algum .p12 aqui e mesmo um PKCS#12 (depende da versao do
+          # fastlane). Tenta a senha do secret e tambem a vazia.
+          for arquivo in *.p12; do
+            [ -e "$arquivo" ] || continue
+            for senha in "$CERT_PASSWORD" ""; do
+              for extra in "" "-legacy"; do
+                if openssl pkcs12 $extra -in "$arquivo" -nodes -passin pass:"$senha" -out "$pem" 2>/dev/null; then
+                  echo "PKCS#12 legivel encontrado: $arquivo"
+                  ok=1
+                  break 3
+                fi
+              done
+            done
+          done
+
+          # Caso 2 (o normal hoje): o fastlane grava a CHAVE PRIVADA em PEM num
+          # arquivo com extensao .p12 e o CERTIFICADO em DER num .cer. Nenhum
+          # dos dois e um PKCS#12 — o pacote precisa ser montado aqui.
+          if [ "$ok" != "1" ]; then
+            chave=""
+            for arquivo in *.p12 *.pem *.key; do
+              [ -e "$arquivo" ] || continue
+              if openssl pkey -in "$arquivo" -noout 2>/dev/null; then chave="$arquivo"; break; fi
+            done
+
+            cert=""
+            for arquivo in *.cer *.crt *.pem; do
+              [ -e "$arquivo" ] || continue
+              if openssl x509 -inform DER -in "$arquivo" -noout 2>/dev/null; then
+                openssl x509 -inform DER -in "$arquivo" -out certificado.pem
+                cert=certificado.pem
+                break
+              elif openssl x509 -in "$arquivo" -noout 2>/dev/null; then
+                cert="$arquivo"
+                break
+              fi
+            done
+
+            if [ -z "$chave" ] || [ -z "$cert" ]; then
+              echo "::error::Nao encontrei o par chave privada + certificado nos arquivos listados acima."
+              exit 1
+            fi
+            echo "Chave privada: $chave | certificado: $cert"
+            cat "$chave" "$cert" > "$pem"
+          fi
+
+          openssl x509 -in "$pem" -noout -subject -enddate || true
+
+          # PBE antigo (3DES/SHA1) e o formato que o `security import` do macOS
+          # aceita em qualquer versao. Se o openssl do runner nao tiver essas
+          # opcoes, exporta no padrao dele.
+          if ! openssl pkcs12 -export -in "$pem" -out distribution.p12 \
+                 -passout pass:"$CERT_PASSWORD" -name "ZapBairro Distribution" \
+                 -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 2>/dev/null; then
+            openssl pkcs12 -export -in "$pem" -out distribution.p12 \
+              -passout pass:"$CERT_PASSWORD" -name "ZapBairro Distribution"
+          fi
+          rm -f "$pem" certificado.pem
+
+          # Confere que o arquivo final abre mesmo com a senha do secret.
+          openssl pkcs12 -in distribution.p12 -passin pass:"$CERT_PASSWORD" -nokeys -noout
+          echo "distribution.p12 validado."
+
+          openssl base64 -A -in distribution.p12 -out IOS_DIST_CERT_P12.base64.txt
+          echo "Base64 pronto para colar no secret IOS_DIST_CERT_P12."
+
+      - name: Publicar o certificado como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-signing-bootstrap
+          path: |
+            ios/fastlane/certs/distribution.p12
+            ios/fastlane/certs/IOS_DIST_CERT_P12.base64.txt
+            ios/fastlane/profiles/*.mobileprovision
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Instrucoes finais
+        run: |
+          echo "### Certificado criado :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "1. Baixe o artefato **ios-signing-bootstrap** deste run." >> "$GITHUB_STEP_SUMMARY"
+          echo "2. Abra \`IOS_DIST_CERT_P12.base64.txt\` e copie todo o conteudo." >> "$GITHUB_STEP_SUMMARY"
+          echo "3. Crie o secret **IOS_DIST_CERT_P12** com esse conteudo." >> "$GITHUB_STEP_SUMMARY"
+          echo "4. Guarde o \`distribution.p12\` em local seguro (fora do repositorio)." >> "$GITHUB_STEP_SUMMARY"
+          echo "5. Rode o workflow **iOS - Build IPA (App Store)**." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> Nao rode este workflow de novo: cada execucao consome uma vaga de certificado na conta Apple." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Limpar credenciais do runner
+        if: always()
+        run: rm -rf ios/fastlane/certs ios/fastlane/profiles
