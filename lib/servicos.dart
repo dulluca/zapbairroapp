@@ -52,6 +52,10 @@ Map<String, dynamic> resumoLoja(Map<String, dynamic> dados, {String? id}) {
 // =====================================================================
 // MORADOR: cadastro capturado no primeiro acesso (nome + WhatsApp).
 // Fica salvo localmente e tambem no Firestore (colecao 'moradores').
+//
+// ATENCAO: o dialogo de cadastro esta DESATIVADO (ver mostrarCadastroMorador
+// em main.dart), portanto nada e coletado e dados() devolve strings vazias.
+// O servico continua aqui para quando/se voltarmos a pedir nome + WhatsApp.
 // =====================================================================
 class MoradorService {
   static const _kNome = 'morador_nome';

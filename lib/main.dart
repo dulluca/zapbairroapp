@@ -64,16 +64,19 @@ class _TelaCategoriasState extends State<TelaCategorias> {
   @override
   void initState() {
     super.initState();
-    // No primeiro acesso, captura nome + WhatsApp do morador.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _verificarCadastro());
+    // DESATIVADO: cadastro de nome + WhatsApp no primeiro acesso.
+    // Para reabilitar, descomente a linha abaixo e o metodo _verificarCadastro,
+    // junto com a funcao mostrarCadastroMorador() mais abaixo neste arquivo.
+    // WidgetsBinding.instance.addPostFrameCallback((_) => _verificarCadastro());
   }
 
-  Future<void> _verificarCadastro() async {
-    final cadastrado = await MoradorService.estaCadastrado();
-    if (!cadastrado && mounted) {
-      await mostrarCadastroMorador(context);
-    }
-  }
+  // DESATIVADO junto com o dialogo de cadastro do morador.
+  // Future<void> _verificarCadastro() async {
+  //   final cadastrado = await MoradorService.estaCadastrado();
+  //   if (!cadastrado && mounted) {
+  //     await mostrarCadastroMorador(context);
+  //   }
+  // }
 
   // Botão CONTATO: abre o WhatsApp oficial do ZapBairro.
   void _abrirContato() {
@@ -1015,7 +1018,12 @@ class _BotaoFavoritoState extends State<BotaoFavorito> {
 
 // =====================================================================
 // CADASTRO DO MORADOR (primeiro acesso): captura nome + WhatsApp.
+//
+// DESATIVADO: por enquanto nao coletamos nome nem WhatsApp do morador.
+// O codigo abaixo fica comentado para podermos reabilitar depois; nesse
+// caso, descomente tambem a chamada em _TelaCategoriasState.initState().
 // =====================================================================
+/*
 Future<void> mostrarCadastroMorador(BuildContext context) async {
   final nomeCtrl = TextEditingController();
   final telCtrl = TextEditingController();
@@ -1109,6 +1117,7 @@ Future<void> mostrarCadastroMorador(BuildContext context) async {
     },
   );
 }
+*/
 
 // =====================================================================
 // TELA FAVORITOS: lista as lojas que o morador guardou.
