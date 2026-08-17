@@ -1360,8 +1360,8 @@
     "endereco": "Conj. Maguari - Principal - entre 3 e 4",
     "horario": "Segunda a sábado 5h30 às 24h",
     "entrega": "Presencial",
-    "telefone": 5591981179599,
-    "telefone2": 5591920030533
+    "telefone": 5591920030595,
+    "telefone2": 5591920030595
   },
   {
     "categoria": "Saúde & Bem-estar",
@@ -1651,7 +1651,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo consignado / Contabilidade / Advocacia / Despachante",
+    "subcategoria": "Empréstimo / Contabilidade / Despachante",
     "nome": "MAGUARI - Focus Cred",
     "descricao": "Empréstimos, consignados, Financiamento...",
     "endereco": "Conj. Maguari - Principal esquina da 8",
@@ -1662,7 +1662,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo consignado / Contabilidade / Advocacia / Despachante",
+    "subcategoria": "Empréstimo / Contabilidade / Despachante",
     "nome": "MAGUARI - Nazareno despachante",
     "descricao": "Serviços de despachante junto ao detran",
     "endereco": "Conj. Maguari - Alameda 3, 78",
@@ -1673,7 +1673,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo consignado / Contabilidade / Advocacia / Despachante",
+    "subcategoria": "Empréstimo / Contabilidade / Despachante",
     "nome": "TENONÉ - Carlos Eduardo Contabilista",
     "descricao": "Serviços contábeis em geral",
     "endereco": "Tenoné - 1º de maio, 46 - Conj. Celso Daniel",
@@ -1684,7 +1684,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo consignado / Contabilidade / Advocacia / Despachante",
+    "subcategoria": "Empréstimo / Contabilidade / Despachante",
     "nome": "SATÉLITE - Solange Abreu Serviços de Contabilidade",
     "descricao": "Abertura/baixa de empresas, declarações acessórias, dept de pessoal e RH",
     "endereco": "Conj. Satélite - WE 8, 775 - próximo da UBS",
@@ -1695,7 +1695,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "TENONÉ - Metalurgica Ideal",
     "descricao": "Serviços de metalurgia em geral",
     "endereco": "Tenoné - Principal, WE2 Nº 17",
@@ -1706,7 +1706,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "TENONÉ - Francisco Metalurgico",
     "descricao": "Serviços de metalurgia em geral",
     "endereco": "",
@@ -1717,7 +1717,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "TENONÉ - Pedro Marceneiro",
     "descricao": "Móveis planejados, portas, janelas...",
     "endereco": "Rua Mario Andreaza, 48",
@@ -1728,7 +1728,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "TENONÉ - Metalurgica 6a Linha",
     "descricao": "Metalurgia e Cominicação Visual, Carro de lanche",
     "endereco": "Tenoné - 6a Linha, 65C",
@@ -1739,7 +1739,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "MAGUARI - Pinturas Pantera Cor de Rosa",
     "descricao": "Pinturas em geral, Abre Letras (Letrista)",
     "endereco": "MAGUARI - Rua Belém, 20",
@@ -1750,7 +1750,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "40 HORAS - JR Construção Eletricista Predial",
     "descricao": "Todos os serviços de eletricista: Quadro elético, luminárias, bombas, chuveiro.",
     "endereco": "40 Horas - Passagem Oliveira, 9",
@@ -1761,7 +1761,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Pedreiro / Encanador / Eletricista / Pintor / Carpinteiro / Metalúrgico",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
     "nome": "40 HORAS - JR Construção Serviço de Pedreiro",
     "descricao": "Da fundação até a entrega das chaves",
     "endereco": "40 Horas - Passagem Oliveira, 9",
