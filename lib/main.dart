@@ -61,6 +61,28 @@ class TelaCategorias extends StatefulWidget {
 }
 
 class _TelaCategoriasState extends State<TelaCategorias> {
+  final TextEditingController _controladorBusca = TextEditingController();
+
+  @override
+  void dispose() {
+    _controladorBusca.dispose();
+    super.dispose();
+  }
+
+  // Abre a lista de resultados para o que o morador digitou.
+  void _executarBusca() {
+    final termo = _controladorBusca.text.trim();
+    if (termo.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            TelaComercios(categoriaNome: '', termoBusca: termo),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -106,14 +128,26 @@ class _TelaCategoriasState extends State<TelaCategorias> {
   Widget _barraDeAcoes() {
     return Row(
       children: [
-        _botaoAcao(Icons.headset_mic, 'CONTATO', Colors.green[700]!,
-            _abrirContato),
+        _botaoAcao(
+          Icons.headset_mic,
+          'CONTATO',
+          Colors.green[700]!,
+          _abrirContato,
+        ),
         const SizedBox(width: 10),
-        _botaoAcao(Icons.star_rate, 'AVALIAÇÃO', Colors.amber[800]!,
-            _abrirAvaliacao),
+        _botaoAcao(
+          Icons.star_rate,
+          'AVALIAÇÃO',
+          Colors.amber[800]!,
+          _abrirAvaliacao,
+        ),
         const SizedBox(width: 10),
-        _botaoAcao(Icons.favorite, 'FAVORITOS', Colors.red[600]!,
-            _abrirFavoritos),
+        _botaoAcao(
+          Icons.favorite,
+          'FAVORITOS',
+          Colors.red[600]!,
+          _abrirFavoritos,
+        ),
       ],
     );
   }
@@ -127,9 +161,7 @@ class _TelaCategoriasState extends State<TelaCategorias> {
     return Expanded(
       child: Card(
         elevation: 3,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
@@ -261,23 +293,16 @@ class _TelaCategoriasState extends State<TelaCategorias> {
             _barraDeAcoes(),
             const SizedBox(height: 14),
             TextField(
+              controller: _controladorBusca,
               textInputAction: TextInputAction.search,
-              onSubmitted: (textoDigitado) {
-                if (textoDigitado.trim().isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TelaComercios(
-                        categoriaNome: '',
-                        termoBusca: textoDigitado.trim(),
-                      ),
-                    ),
-                  );
-                }
-              },
+              onSubmitted: (_) => _executarBusca(),
               decoration: InputDecoration(
                 hintText: 'O que você procura no bairro hoje?',
-                prefixIcon: const Icon(Icons.search, color: Colors.green),
+                prefixIcon: IconButton(
+                  icon: const Icon(Icons.search, color: Colors.green),
+                  tooltip: 'Buscar',
+                  onPressed: _executarBusca,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30.0),
                 ),
@@ -453,9 +478,7 @@ class TelaSubcategorias extends StatelessWidget {
                           Icon(visual.icone, size: 40, color: visual.cor),
                           const SizedBox(height: 8),
                           Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Text(
                               subcat,
                               style: const TextStyle(
@@ -479,6 +502,133 @@ class TelaSubcategorias extends StatelessWidget {
   }
 }
 
+// --- BUSCA: comparação de texto sem depender de acento ou maiúscula ---
+const Map<String, String> _acentos = {
+  'á': 'a',
+  'à': 'a',
+  'ã': 'a',
+  'â': 'a',
+  'ä': 'a',
+  'é': 'e',
+  'è': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'í': 'i',
+  'ì': 'i',
+  'î': 'i',
+  'ï': 'i',
+  'ó': 'o',
+  'ò': 'o',
+  'õ': 'o',
+  'ô': 'o',
+  'ö': 'o',
+  'ú': 'u',
+  'ù': 'u',
+  'û': 'u',
+  'ü': 'u',
+  'ç': 'c',
+  'ñ': 'n',
+};
+
+/// Deixa o texto em minúsculas e sem acentos, para "Açaí" casar com "acai".
+String normalizarTexto(String texto) {
+  final buffer = StringBuffer();
+  for (final letra in texto.toLowerCase().split('')) {
+    buffer.write(_acentos[letra] ?? letra);
+  }
+  return buffer.toString();
+}
+
+/// Quebra o que o morador digitou em palavras normalizadas.
+List<String> palavrasDaBusca(String termo) => normalizarTexto(
+  termo,
+).split(RegExp(r'[\s,]+')).where((palavra) => palavra.isNotEmpty).toList();
+
+/// Relevância do comércio para a busca: 0 = não casa, 3 = casa pelo nome.
+/// Todas as palavras digitadas precisam aparecer em algum campo do comércio.
+int relevanciaBusca(Map<String, dynamic> dados, List<String> palavras) {
+  if (palavras.isEmpty) return 1;
+
+  String campo(String chave) =>
+      normalizarTexto((dados[chave] ?? '').toString());
+
+  final nome = campo('nome');
+  final tipo = '${campo('categoria')} ${campo('subcategoria')}';
+  final resto = '${campo('descricao')} ${campo('endereco')}';
+  final tudo = '$nome $tipo $resto';
+
+  if (!palavras.every(tudo.contains)) return 0;
+  if (palavras.every(nome.contains)) return 3;
+  if (palavras.every(tipo.contains)) return 2;
+  return 1;
+}
+
+// --- AVALIAÇÕES: widgets de exibição da nota dada pela comunidade ---
+
+/// Cinco estrelas preenchidas conforme a nota (0 a 5). Só exibe, não recebe toque.
+class EstrelasNota extends StatelessWidget {
+  final double nota;
+  final double tamanho;
+
+  const EstrelasNota({super.key, required this.nota, this.tamanho = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final posicao = i + 1;
+        final IconData icone;
+        if (nota >= posicao) {
+          icone = Icons.star;
+        } else if (nota >= posicao - 0.5) {
+          icone = Icons.star_half;
+        } else {
+          icone = Icons.star_border;
+        }
+        return Icon(icone, color: Colors.amber[700], size: tamanho);
+      }),
+    );
+  }
+}
+
+/// Linha compacta com as estrelas, a media e quantas pessoas avaliaram.
+class LinhaAvaliacao extends StatelessWidget {
+  final ResumoAvaliacoes resumo;
+  final double tamanho;
+
+  const LinhaAvaliacao({super.key, required this.resumo, this.tamanho = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!resumo.temAvaliacao) {
+      return Text(
+        'Ainda sem avaliações — seja o primeiro a avaliar',
+        style: TextStyle(fontSize: tamanho - 3, color: Colors.grey[600]),
+      );
+    }
+
+    final media = resumo.media.toStringAsFixed(1).replaceAll('.', ',');
+    final plural = resumo.total == 1 ? 'avaliação' : 'avaliações';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        EstrelasNota(nota: resumo.media, tamanho: tamanho),
+        const SizedBox(width: 6),
+        Text(
+          '$media  (${resumo.total} $plural)',
+          style: TextStyle(
+            fontSize: tamanho - 2,
+            color: Colors.black87,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // --- TELA 2: LISTA DE COMÉRCIOS (FILTRANDO DUPLICADOS PELO NOME) ---
 class TelaComercios extends StatelessWidget {
   final String categoriaNome;
@@ -494,13 +644,18 @@ class TelaComercios extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final termo = (termoBusca ?? '').trim();
+    final buscando = termo.isNotEmpty;
+    final palavras = palavrasDaBusca(termo);
+
     Query query = FirebaseFirestore.instance.collection('comercios');
 
-    if (termoBusca != null && termoBusca!.isNotEmpty) {
-      query = query
-          .where('nome', isGreaterThanOrEqualTo: termoBusca)
-          .where('nome', isLessThanOrEqualTo: '$termoBusca\uf8ff');
-    } else {
+    // Na busca por texto lemos a coleção inteira e filtramos aqui no app.
+    // O Firestore só sabe casar prefixo exato do campo 'nome' (com acento e
+    // maiúscula iguais), então quem digitava "acai" ou "pizza" nunca achava
+    // nada: os nomes começam com o conjunto ("MAGUARI - ...") e o termo que
+    // interessa costuma estar na descrição ou na subcategoria.
+    if (!buscando) {
       query = query.where('categoria', isEqualTo: categoriaNome);
       if (subcategoriaNome != null) {
         query = query.where('subcategoria', isEqualTo: subcategoriaNome);
@@ -510,8 +665,8 @@ class TelaComercios extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          termoBusca != null
-              ? 'Resultados para: "$termoBusca"'
+          buscando
+              ? 'Resultados para: "$termo"'
               : (subcategoriaNome ?? categoriaNome),
           style: const TextStyle(color: Colors.white),
         ),
@@ -524,86 +679,131 @@ class TelaComercios extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Text(
-                termoBusca != null
-                    ? 'Nenhum comércio encontrado para "$termoBusca".'
-                    : (subcategoriaNome != null
-                          ? 'Nenhum comércio em $subcategoriaNome.'
-                          : 'Nenhum comércio em $categoriaNome.'),
-              ),
-            );
-          }
-
-          // --- FILTRO ANTI-DUPLICADOS PELO NOME DO COMÉRCIO ---
-          final docsBrutos = snapshot.data!.docs;
+          // --- FILTRO DA BUSCA + ANTI-DUPLICADOS PELO NOME DO COMÉRCIO ---
+          final docsBrutos = snapshot.data?.docs ?? [];
           final nomesVistos = <String>{};
-          final listaComercios = docsBrutos.where((doc) {
+          final relevancias = <String, int>{};
+          final listaComercios = <QueryDocumentSnapshot>[];
+
+          for (final doc in docsBrutos) {
             final dados = doc.data() as Map<String, dynamic>;
             final nomeLoja = (dados['nome'] ?? '')
                 .toString()
                 .trim()
                 .toLowerCase();
 
-            if (nomeLoja.isEmpty) return false;
+            if (nomeLoja.isEmpty) continue;
+            if (!nomesVistos.add(nomeLoja)) continue;
 
-            if (nomesVistos.contains(nomeLoja)) {
-              return false;
-            } else {
-              nomesVistos.add(nomeLoja);
-              return true;
-            }
-          }).toList();
+            final relevancia = relevanciaBusca(dados, palavras);
+            if (relevancia == 0) continue;
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: listaComercios.length,
-            itemBuilder: (context, index) {
-              final dados =
-                  listaComercios[index].data() as Map<String, dynamic>;
-              final loja = {...dados, 'id': listaComercios[index].id};
+            relevancias[doc.id] = relevancia;
+            listaComercios.add(doc);
+          }
 
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  title: Text(
-                    dados['nome'] ?? 'Sem nome',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    dados['descricao'] ?? 'Sem descrição',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BotaoFavorito(loja: loja),
-                      const Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.green,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TelaDetalhes(
-                          dadosComercio: dados,
-                          comercioId: listaComercios[index].id,
+          if (buscando) {
+            // Quem casa pelo nome vem primeiro, depois por tipo; dentro da
+            // mesma relevância, ordem alfabética.
+            listaComercios.sort((a, b) {
+              final diferenca =
+                  (relevancias[b.id] ?? 0) - (relevancias[a.id] ?? 0);
+              if (diferenca != 0) return diferenca;
+
+              final nomeA = ((a.data() as Map<String, dynamic>)['nome'] ?? '')
+                  .toString();
+              final nomeB = ((b.data() as Map<String, dynamic>)['nome'] ?? '')
+                  .toString();
+              return normalizarTexto(nomeA).compareTo(normalizarTexto(nomeB));
+            });
+          }
+
+          if (listaComercios.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Text(
+                  buscando
+                      ? 'Nenhum comércio encontrado para "$termo".'
+                      : (subcategoriaNome != null
+                            ? 'Nenhum comércio em $subcategoriaNome.'
+                            : 'Nenhum comércio em $categoriaNome.'),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          // Notas da comunidade, para mostrar a média de cada loja na lista.
+          return StreamBuilder<Map<String, ResumoAvaliacoes>>(
+            stream: AvaliacaoService.resumoPorLoja(),
+            builder: (context, snapNotas) {
+              final resumos =
+                  snapNotas.data ?? const <String, ResumoAvaliacoes>{};
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: listaComercios.length,
+                itemBuilder: (context, index) {
+                  final dados =
+                      listaComercios[index].data() as Map<String, dynamic>;
+                  final loja = {...dados, 'id': listaComercios[index].id};
+                  final resumo =
+                      resumos[AvaliacaoService.chaveLojaAvaliada(
+                        dados['nome'],
+                      )] ??
+                      ResumoAvaliacoes.vazio;
+
+                  return Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      title: Text(
+                        dados['nome'] ?? 'Sem nome',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  },
-                ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            dados['descricao'] ?? 'Sem descrição',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          LinhaAvaliacao(resumo: resumo, tamanho: 15),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          BotaoFavorito(loja: loja),
+                          const Icon(
+                            Icons.arrow_forward_ios,
+                            color: Colors.green,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TelaDetalhes(
+                              dadosComercio: dados,
+                              comercioId: listaComercios[index].id,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               );
             },
           );
@@ -617,11 +817,7 @@ class TelaComercios extends StatelessWidget {
 class TelaDetalhes extends StatefulWidget {
   final Map<String, dynamic> dadosComercio;
   final String? comercioId;
-  const TelaDetalhes({
-    super.key,
-    required this.dadosComercio,
-    this.comercioId,
-  });
+  const TelaDetalhes({super.key, required this.dadosComercio, this.comercioId});
 
   @override
   State<TelaDetalhes> createState() => _TelaDetalhesState();
@@ -644,10 +840,9 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
     final id = widget.comercioId;
     if (id == null || id.isEmpty) return;
     try {
-      await FirebaseFirestore.instance
-          .collection('comercios')
-          .doc(id)
-          .update({'visitas': FieldValue.increment(1)});
+      await FirebaseFirestore.instance.collection('comercios').doc(id).update({
+        'visitas': FieldValue.increment(1),
+      });
     } catch (e) {
       debugPrint('Não foi possível registrar a visita: $e');
     }
@@ -692,6 +887,9 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
                 color: Colors.black87,
               ),
             ),
+            const SizedBox(height: 8),
+            _blocoNota(nome),
+
             const Divider(height: 30, thickness: 1),
 
             buildInfoRow(Icons.location_on, 'Endereço', endereco),
@@ -757,6 +955,140 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
                 ),
                 onPressed: () => abrirWhatsApp(tel2.toString()),
               ),
+
+            const Divider(height: 40, thickness: 1),
+            _secaoAvaliacoes(nome),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Estrelas + media da loja, alimentadas pelas avaliações dos moradores.
+  Widget _blocoNota(String nome) {
+    return StreamBuilder<Map<String, ResumoAvaliacoes>>(
+      stream: AvaliacaoService.resumoPorLoja(),
+      builder: (context, snapshot) {
+        final resumo =
+            (snapshot.data ??
+                const <
+                  String,
+                  ResumoAvaliacoes
+                >{})[AvaliacaoService.chaveLojaAvaliada(nome)] ??
+            ResumoAvaliacoes.vazio;
+        return LinhaAvaliacao(resumo: resumo, tamanho: 20);
+      },
+    );
+  }
+
+  // Abre o mesmo diálogo de estrelas usado na tela de Avaliacao.
+  Future<void> _avaliarEstaLoja() async {
+    final loja = {...widget.dadosComercio, 'id': widget.comercioId ?? ''};
+    final enviou = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _DialogoAvaliacao(loja: loja),
+    );
+    if (enviou == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Obrigado pela sua avaliação!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  // Botão de avaliar + o que a vizinhança já escreveu sobre esta loja.
+  Widget _secaoAvaliacoes(String nome) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Avaliações da vizinhança',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.green[800],
+            side: BorderSide(color: Colors.green[700]!, width: 1.5),
+            minimumSize: const Size(double.infinity, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.star_rate),
+          label: const Text(
+            'Avaliar esta loja',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          onPressed: _avaliarEstaLoja,
+        ),
+        const SizedBox(height: 16),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: AvaliacaoService.daLoja(nome),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final avaliacoes = snapshot.data ?? const [];
+            if (avaliacoes.isEmpty) {
+              return Text(
+                'Nenhum morador avaliou esta loja ainda. '
+                'Se você já foi atendido aqui, deixe sua nota para ajudar a vizinhança.',
+                style: TextStyle(color: Colors.grey[600], height: 1.4),
+              );
+            }
+
+            return Column(children: avaliacoes.map(_cartaoAvaliacao).toList());
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _cartaoAvaliacao(Map<String, dynamic> avaliacao) {
+    final nota = (avaliacao['nota'] as num?)?.toDouble() ?? 0;
+    final comentario = (avaliacao['comentario'] ?? '').toString().trim();
+    final autor = (avaliacao['moradorNome'] ?? '').toString().trim();
+    final quando = _formatarData(avaliacao['criadoEm']);
+
+    return Card(
+      elevation: 0,
+      color: Colors.grey[100],
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                EstrelasNota(nota: nota, tamanho: 18),
+                const Spacer(),
+                if (quando.isNotEmpty)
+                  Text(
+                    quando,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+              ],
+            ),
+            if (comentario.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(comentario, style: const TextStyle(height: 1.4)),
+            ],
+            if (autor.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                '- $autor',
+                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              ),
+            ],
           ],
         ),
       ),
@@ -830,9 +1162,7 @@ class TelaAdmin extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const TelaAvaliacoesAdmin(),
-                ),
+                MaterialPageRoute(builder: (_) => const TelaAvaliacoesAdmin()),
               );
             },
           ),
@@ -1285,8 +1615,11 @@ class _TelaAvaliacaoState extends State<TelaAvaliacao> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.store_mall_directory_outlined,
-                        size: 60, color: Colors.grey),
+                    Icon(
+                      Icons.store_mall_directory_outlined,
+                      size: 60,
+                      color: Colors.grey,
+                    ),
                     SizedBox(height: 12),
                     Text(
                       'Você ainda não visitou nenhuma loja.\nAbra uma loja para poder avaliá-la aqui.',
@@ -1374,9 +1707,9 @@ class _DialogoAvaliacaoState extends State<_DialogoAvaliacao> {
     } catch (e) {
       if (mounted) {
         setState(() => _enviando = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível enviar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Não foi possível enviar: $e')));
       }
     }
   }
@@ -1471,9 +1804,7 @@ class TelaHistoricoEspecialidades extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text('Nenhum acesso registrado ainda.'),
-            );
+            return const Center(child: Text('Nenhum acesso registrado ainda.'));
           }
           final docs = snapshot.data!.docs;
           final total = docs.fold<int>(0, (soma, d) {
@@ -1513,8 +1844,8 @@ class TelaHistoricoEspecialidades extends StatelessWidget {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final dados = docs[index].data() as Map<String, dynamic>;
-                    final nome =
-                        (dados['especialidade'] ?? 'Sem nome').toString();
+                    final nome = (dados['especialidade'] ?? 'Sem nome')
+                        .toString();
                     final categoria = (dados['categoria'] ?? '').toString();
                     final acessos = dados['acessos'];
                     final int qtd = acessos is num ? acessos.toInt() : 0;
@@ -1569,15 +1900,17 @@ class TelaHistoricoEspecialidades extends StatelessWidget {
 // =====================================================================
 // TELA (ADMIN): feedbacks / avaliações enviadas pelos moradores.
 // =====================================================================
+// Data legível de um Timestamp do Firestore. Usada na tela de detalhes
+// (avaliações da vizinhanca) e no painel administrativo.
+String _formatarData(dynamic criadoEm) {
+  if (criadoEm is! Timestamp) return '';
+  final d = criadoEm.toDate();
+  String dois(int n) => n.toString().padLeft(2, '0');
+  return '${dois(d.day)}/${dois(d.month)}/${d.year} ${dois(d.hour)}:${dois(d.minute)}';
+}
+
 class TelaAvaliacoesAdmin extends StatelessWidget {
   const TelaAvaliacoesAdmin({super.key});
-
-  String _formatarData(dynamic criadoEm) {
-    if (criadoEm is! Timestamp) return '';
-    final d = criadoEm.toDate();
-    String dois(int n) => n.toString().padLeft(2, '0');
-    return '${dois(d.day)}/${dois(d.month)}/${d.year} ${dois(d.hour)}:${dois(d.minute)}';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1764,8 +2097,7 @@ class TelaAvaliacoesAdmin extends StatelessWidget {
                                         color: Colors.green,
                                         size: 20,
                                       ),
-                                      onPressed: () =>
-                                          abrirWhatsAppNumeroCompleto(
+                                      onPressed: () => abrirWhatsAppNumeroCompleto(
                                         moradorTel,
                                         mensagem:
                                             'Olá! Aqui é do ZapBairro, sobre sua avaliação.',
