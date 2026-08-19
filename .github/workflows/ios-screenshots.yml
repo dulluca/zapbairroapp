@@ -1,0 +1,163 @@
+name: iOS - Capturas de tela (App Store)
+
+# Gera as capturas de tela da App Store rodando o app no Simulador do iOS.
+#
+# Existe por causa da rejeicao 2.3.10: as capturas anteriores eram prints do
+# Android, com a barra de status do Android. As daqui saem do proprio iOS.
+# Nenhum iPhone e necessario -- o runner macOS ja traz Xcode e os Simuladores.
+#
+# Ao final, baixe o artefato "capturas-ios" do run e suba as imagens em
+# App Store Connect > Previas e Capturas de Tela.
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulador:
+        description: "Nome do simulador (vazio = escolhe um iPhone Pro Max)"
+        required: false
+        default: ""
+
+env:
+  IOS_BUNDLE_ID: com.zapbairro.zapbairro
+  FLUTTER_VERSION: 3.44.4
+
+jobs:
+  capturas:
+    name: Gerar capturas no Simulador
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Selecionar Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Instalar GoogleService-Info.plist
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: |
+          set -euo pipefail
+          destino=ios/Runner/GoogleService-Info.plist
+          if [ -n "${GOOGLE_SERVICE_INFO_PLIST:-}" ]; then
+            printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" | tr -d '\n\r' | openssl base64 -d -A > "$destino"
+            echo "GoogleService-Info.plist escrito a partir do secret."
+          elif [ -f "$destino" ]; then
+            echo "Usando o GoogleService-Info.plist versionado no repositorio."
+          else
+            echo "::error::Sem GoogleService-Info.plist. O app abre e crasha sem ele."
+            exit 1
+          fi
+
+          # O app chama Firebase.initializeApp() sem opcoes: se o bundle nao
+          # bater, ele crasha na abertura e nao sai captura nenhuma.
+          gsi_bundle=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$destino")
+          if [ "$gsi_bundle" != "$IOS_BUNDLE_ID" ]; then
+            echo "::error::GoogleService-Info.plist e do bundle '$gsi_bundle', mas o app e '$IOS_BUNDLE_ID'."
+            exit 1
+          fi
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Escolher e ligar o simulador
+        env:
+          SIMULADOR_PEDIDO: ${{ github.event.inputs.simulador }}
+        run: |
+          set -euo pipefail
+
+          echo "--- Simuladores disponiveis neste runner ---"
+          xcrun simctl list devices available | grep -i iphone || true
+          echo "-------------------------------------------"
+
+          escolher() {
+            # Devolve o UDID do primeiro simulador disponivel cujo nome casa
+            # com o padrao recebido.
+            xcrun simctl list devices available \
+              | grep -E "$1" \
+              | head -1 \
+              | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'
+          }
+
+          if [ -n "${SIMULADOR_PEDIDO:-}" ]; then
+            udid=$(escolher "$SIMULADOR_PEDIDO")
+            nome="$SIMULADOR_PEDIDO"
+          else
+            # A App Store pede a captura de 6.9 polegadas, que e o tamanho dos
+            # modelos Pro Max recentes. Tentamos do mais novo para o mais antigo.
+            for padrao in "iPhone 1[789] Pro Max" "iPhone 16 Pro Max" "iPhone 15 Pro Max" "iPhone .* Pro Max" "iPhone"; do
+              udid=$(escolher "$padrao")
+              if [ -n "$udid" ]; then nome="$padrao"; break; fi
+            done
+          fi
+
+          if [ -z "${udid:-}" ]; then
+            echo "::error::Nenhum simulador de iPhone disponivel neste runner."
+            exit 1
+          fi
+
+          echo "Simulador escolhido ($nome): $udid"
+          echo "SIMULADOR_UDID=$udid" >> "$GITHUB_ENV"
+
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b
+
+          # Relogio 9:41 e sinal/bateria cheios, como nas capturas da Apple.
+          xcrun simctl status_bar "$udid" override \
+            --time "9:41" \
+            --cellularMode active \
+            --cellularBars 4 \
+            --wifiMode active \
+            --wifiBars 3 \
+            --batteryState charged \
+            --batteryLevel 100 || true
+
+      - name: Gerar as capturas
+        run: |
+          set -euo pipefail
+
+          # Mesmo motivo do workflow de release: este projeto usa Swift Package
+          # Manager, nao CocoaPods.
+          if [ -f ios/Podfile ]; then
+            echo "::error::ios/Podfile voltou a existir; este projeto usa Swift Package Manager."
+            exit 1
+          fi
+          flutter config --enable-swift-package-manager
+
+          flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/capturas_test.dart \
+            -d "$SIMULADOR_UDID"
+
+      - name: Conferir o que saiu
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -d screenshots ] || [ -z "$(ls -A screenshots 2>/dev/null)" ]; then
+            echo "::error::Nenhuma captura foi gerada. Veja o log do passo anterior."
+            exit 1
+          fi
+          echo "Capturas geradas:"
+          for img in screenshots/*.png; do
+            tamanho=$(sips -g pixelWidth -g pixelHeight "$img" | awk '/pixel/ {printf "%s ", $2}')
+            echo "  $(basename "$img") -> ${tamanho}px"
+          done
+
+      - name: Publicar as capturas como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-ios
+          path: screenshots/
+          if-no-files-found: error
+          retention-days: 30

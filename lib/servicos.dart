@@ -194,6 +194,18 @@ class FavoritosService {
 // =====================================================================
 // AVALIACOES: nota (1..5) + comentario de uma loja, salvos no Firestore.
 // =====================================================================
+/// Media e quantidade de avaliacoes de uma loja.
+class ResumoAvaliacoes {
+  final double media;
+  final int total;
+
+  const ResumoAvaliacoes(this.media, this.total);
+
+  static const ResumoAvaliacoes vazio = ResumoAvaliacoes(0, 0);
+
+  bool get temAvaliacao => total > 0;
+}
+
 class AvaliacaoService {
   static Future<void> enviar({
     required Map<String, dynamic> loja,
@@ -209,6 +221,73 @@ class AvaliacaoService {
       'moradorTelefone': morador['telefone'] ?? '',
       'moradorNome': morador['nome'] ?? '',
       'criadoEm': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Agrupamos as avaliacoes pelo nome da loja, e nao pelo id do documento,
+  // porque a colecao 'comercios' tem lojas repetidas com o mesmo nome; as
+  // telas ja deduplicam desse jeito (trim + minusculas).
+  static String chaveLojaAvaliada(Object? nomeLoja) =>
+      (nomeLoja ?? '').toString().trim().toLowerCase();
+
+  /// Media e total de avaliacoes de cada loja, para a lista de comercios.
+  static Stream<Map<String, ResumoAvaliacoes>> resumoPorLoja() {
+    return FirebaseFirestore.instance.collection('avaliacoes').snapshots().map((
+      snapshot,
+    ) {
+      final somas = <String, int>{};
+      final totais = <String, int>{};
+
+      for (final doc in snapshot.docs) {
+        final dados = doc.data();
+        final chave = chaveLojaAvaliada(dados['comercioNome']);
+        final nota = (dados['nota'] as num?)?.toInt() ?? 0;
+        if (chave.isEmpty || nota < 1 || nota > 5) continue;
+
+        somas[chave] = (somas[chave] ?? 0) + nota;
+        totais[chave] = (totais[chave] ?? 0) + 1;
+      }
+
+      return {
+        for (final chave in totais.keys)
+          chave: ResumoAvaliacoes(
+            somas[chave]! / totais[chave]!,
+            totais[chave]!,
+          ),
+      };
+    });
+  }
+
+  /// Avaliacoes de uma loja, da mais recente para a mais antiga.
+  ///
+  /// Filtramos e ordenamos no app de proposito: um where + orderBy em campos
+  /// diferentes exigiria indice composto no Firestore, e sem esse indice a
+  /// consulta falha em producao.
+  static Stream<List<Map<String, dynamic>>> daLoja(String nomeLoja) {
+    final alvo = chaveLojaAvaliada(nomeLoja);
+
+    return FirebaseFirestore.instance.collection('avaliacoes').snapshots().map((
+      snapshot,
+    ) {
+      final lista = snapshot.docs
+          .map((doc) => doc.data())
+          .where((d) => chaveLojaAvaliada(d['comercioNome']) == alvo)
+          .toList();
+
+      lista.sort((a, b) {
+        final dataA = a['criadoEm'];
+        final dataB = b['criadoEm'];
+        if (dataA is Timestamp && dataB is Timestamp) {
+          return dataB.compareTo(dataA);
+        }
+        // Avaliacao recem-enviada ainda nao tem o timestamp do servidor;
+        // ela fica no topo, que e onde o morador espera ver a dele.
+        if (dataA == null) return -1;
+        if (dataB == null) return 1;
+        return 0;
+      });
+
+      return lista;
     });
   }
 }
@@ -268,34 +347,79 @@ const List<_RegraIcone> _regrasIcone = [
   _RegraIcone(['café', 'cafe', 'cafeteria'], Icons.local_cafe),
   _RegraIcone(['restaurante', 'marmita', 'almoço', 'almoco'], Icons.restaurant),
   _RegraIcone(['doce', 'bolo', 'salgado'], Icons.cake),
-  _RegraIcone(['farmácia', 'farmacia', 'remédio', 'remedio'],
-      Icons.local_pharmacy),
-  _RegraIcone(['médic', 'medic', 'clínica', 'clinica', 'saúde', 'saude'],
-      Icons.local_hospital),
+  _RegraIcone([
+    'farmácia',
+    'farmacia',
+    'remédio',
+    'remedio',
+  ], Icons.local_pharmacy),
+  _RegraIcone([
+    'médic',
+    'medic',
+    'clínica',
+    'clinica',
+    'saúde',
+    'saude',
+  ], Icons.local_hospital),
   _RegraIcone(['dentista', 'odonto'], Icons.medical_services),
-  _RegraIcone(['barbe', 'cabelo', 'salão', 'salao', 'beleza'],
-      Icons.content_cut),
+  _RegraIcone([
+    'barbe',
+    'cabelo',
+    'salão',
+    'salao',
+    'beleza',
+  ], Icons.content_cut),
   _RegraIcone(['unha', 'manicure', 'estética', 'estetica'], Icons.spa),
   _RegraIcone(['academia', 'fitness', 'personal'], Icons.fitness_center),
   _RegraIcone(['pet', 'veterin', 'animal'], Icons.pets),
-  _RegraIcone(['mercado', 'mercearia', 'hortifruti', 'sacolão', 'sacolao'],
-      Icons.local_grocery_store),
+  _RegraIcone([
+    'mercado',
+    'mercearia',
+    'hortifruti',
+    'sacolão',
+    'sacolao',
+  ], Icons.local_grocery_store),
   _RegraIcone(['açougue', 'acougue', 'carne'], Icons.set_meal),
-  _RegraIcone(['roupa', 'moda', 'boutique', 'calçado', 'calcado'],
-      Icons.checkroom),
-  _RegraIcone(['carro', 'auto', 'mecânic', 'mecanic', 'oficina', 'moto'],
-      Icons.directions_car),
-  _RegraIcone(['construç', 'construc', 'material', 'ferragem'],
-      Icons.home_repair_service),
+  _RegraIcone([
+    'roupa',
+    'moda',
+    'boutique',
+    'calçado',
+    'calcado',
+  ], Icons.checkroom),
+  _RegraIcone([
+    'carro',
+    'auto',
+    'mecânic',
+    'mecanic',
+    'oficina',
+    'moto',
+  ], Icons.directions_car),
+  _RegraIcone([
+    'construç',
+    'construc',
+    'material',
+    'ferragem',
+  ], Icons.home_repair_service),
   _RegraIcone(['escola', 'curso', 'aula', 'educaç', 'educac'], Icons.school),
-  _RegraIcone(['imóvel', 'imovel', 'imobiliár', 'imobiliar', 'aluguel'],
-      Icons.apartment),
+  _RegraIcone([
+    'imóvel',
+    'imovel',
+    'imobiliár',
+    'imobiliar',
+    'aluguel',
+  ], Icons.apartment),
   _RegraIcone(['festa', 'evento', 'buffet'], Icons.celebration),
   _RegraIcone(['limpeza', 'faxina', 'diarista'], Icons.cleaning_services),
-  _RegraIcone(['eletric', 'encanad', 'reforma', 'pintura', 'serviço',
-      'servico'], Icons.build),
-  _RegraIcone(['loja', 'comércio', 'comercio', 'presente'],
-      Icons.shopping_bag),
+  _RegraIcone([
+    'eletric',
+    'encanad',
+    'reforma',
+    'pintura',
+    'serviço',
+    'servico',
+  ], Icons.build),
+  _RegraIcone(['loja', 'comércio', 'comercio', 'presente'], Icons.shopping_bag),
 ];
 
 const List<Color> _paletaIcones = [
