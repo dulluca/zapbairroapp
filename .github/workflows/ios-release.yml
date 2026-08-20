@@ -81,11 +81,18 @@ jobs:
       - name: Selecionar Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          # Mesmo motivo do workflow de capturas: "latest-stable" no runner
-          # macos-15 hoje entrega o Xcode 26, e a ultima build que a Apple
-          # aceitou saiu do Xcode 16. Nao vale trocar de toolchain no meio de
-          # uma submissao em revisao.
-          xcode-version: "^16.0"
+          # NAO PINAR EM VERSAO ANTIGA. A Apple tem um piso de SDK para upload,
+          # e ele sobe. Os runs #7 e #8 foram compilados com Xcode 16 e o
+          # altool recusou os dois no fim de 85 segundos de upload:
+          #
+          #   Validation failed (409) SDK version issue. This app was built
+          #   with the iOS 18.5 SDK. All iOS and iPadOS apps must be built with
+          #   the iOS 26 SDK or later, included in Xcode 26 or later.
+          #
+          # "latest-stable" acompanha esse piso sozinho, que e o que se quer
+          # aqui. O pin so faz sentido no workflow de capturas, que nao sobe
+          # nada para a Apple.
+          xcode-version: latest-stable
 
       - name: Instalar Flutter
         uses: subosito/flutter-action@v2
