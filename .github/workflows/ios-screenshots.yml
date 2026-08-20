@@ -34,7 +34,12 @@ jobs:
       - name: Selecionar Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          # Nao usar "latest-stable": no runner macos-15 isso hoje traz o
+          # Xcode 26, cujo unico runtime e o iOS 26 -- e foi um simulador
+          # desse runtime (iPhone 17 Pro Max) que travou no boot por 59min.
+          # O Xcode 16 traz o iOS 18, com o iPhone 16 Pro Max, que tem
+          # exatamente as 6,9 polegadas que a App Store pede.
+          xcode-version: "^16.0"
 
       - name: Instalar Flutter
         uses: subosito/flutter-action@v2
@@ -71,22 +76,32 @@ jobs:
         run: flutter pub get
 
       - name: Escolher e ligar o simulador
+        # Prazo curto de proposito: se o simulador empacar, o run morre em
+        # 15 minutos com log, em vez de queimar a hora inteira do job.
+        timeout-minutes: 15
         env:
           SIMULADOR_PEDIDO: ${{ github.event.inputs.simulador }}
         run: |
           set -euo pipefail
 
-          echo "--- Simuladores disponiveis neste runner ---"
+          echo "--- Xcode e runtimes deste runner ---"
+          xcodebuild -version
+          xcrun simctl list runtimes
+          echo "--- Simuladores disponiveis ---"
           xcrun simctl list devices available | grep -i iphone || true
-          echo "-------------------------------------------"
+          echo "-------------------------------------"
 
           escolher() {
             # Devolve o UDID do primeiro simulador disponivel cujo nome casa
             # com o padrao recebido.
+            #
+            # O "awk NR==1" no fim faz o papel do "head -1": o head fecha o
+            # pipe cedo, o grep morre de SIGPIPE e, com pipefail, isso
+            # derrubaria o passo inteiro sem explicacao.
             xcrun simctl list devices available \
               | grep -E "$1" \
-              | head -1 \
-              | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/'
+              | sed -E -n 's/.*\(([0-9A-F-]{36})\).*/\1/p' \
+              | awk 'NR==1' || true
           }
 
           if [ -n "${SIMULADOR_PEDIDO:-}" ]; then
@@ -94,8 +109,8 @@ jobs:
             nome="$SIMULADOR_PEDIDO"
           else
             # A App Store pede a captura de 6.9 polegadas, que e o tamanho dos
-            # modelos Pro Max recentes. Tentamos do mais novo para o mais antigo.
-            for padrao in "iPhone 1[789] Pro Max" "iPhone 16 Pro Max" "iPhone 15 Pro Max" "iPhone .* Pro Max" "iPhone"; do
+            # modelos Pro Max recentes.
+            for padrao in "iPhone 16 Pro Max" "iPhone 1[789] Pro Max" "iPhone .* Pro Max" "iPhone"; do
               udid=$(escolher "$padrao")
               if [ -n "$udid" ]; then nome="$padrao"; break; fi
             done
@@ -109,8 +124,38 @@ jobs:
           echo "Simulador escolhido ($nome): $udid"
           echo "SIMULADOR_UDID=$udid" >> "$GITHUB_ENV"
 
-          xcrun simctl boot "$udid" || true
-          xcrun simctl bootstatus "$udid" -b
+          # Um simulador ligado e so um: o driver fotografa com
+          # `simctl io booted`, que fica ambiguo se houver outro de pe.
+          xcrun simctl shutdown all 2>/dev/null || true
+
+          # A Simulator.app precisa estar aberta. Sem ela, o boot puro do
+          # simctl no runner headless para antes de subir o SpringBoard --
+          # foi ai que o `simctl bootstatus -b` ficou 59 minutos esperando um
+          # fim que nunca chega, porque esse comando nao tem prazo.
+          open -a Simulator --args -CurrentDeviceUDID "$udid" || true
+          xcrun simctl boot "$udid" 2>&1 || true
+
+          # Espera com prazo e com log, no lugar do bootstatus. O teste de
+          # pronto e tirar uma captura de verdade: e exatamente o que o
+          # driver vai fazer depois, entao se passar aqui, passa la.
+          pronto=0
+          for i in $(seq 1 60); do
+            estado=$(xcrun simctl list devices | grep "$udid" | sed -E 's/.*\(([^()]+)\)[[:space:]]*$/\1/' || true)
+            echo "[$((i * 5))s] estado: ${estado:-desconhecido}"
+            if [ "$estado" = "Booted" ] \
+               && xcrun simctl io "$udid" screenshot /tmp/probe.png >/dev/null 2>&1; then
+              pronto=1
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$pronto" != "1" ]; then
+            echo "::error::O simulador nao terminou de ligar em 5 minutos."
+            xcrun simctl list devices | grep "$udid" || true
+            exit 1
+          fi
+          echo "Simulador pronto."
 
           # Relogio 9:41 e sinal/bateria cheios, como nas capturas da Apple.
           xcrun simctl status_bar "$udid" override \
@@ -123,6 +168,7 @@ jobs:
             --batteryLevel 100 || true
 
       - name: Gerar as capturas
+        timeout-minutes: 30
         run: |
           set -euo pipefail
 
