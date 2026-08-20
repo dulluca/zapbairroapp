@@ -46,11 +46,24 @@ void main() {
       }
     }
 
+    // A foto nao e tirada aqui. Esta linha e o sinal para o workflow disparar
+    // um `xcrun simctl io screenshot` enquanto a tela ainda esta de pe -- e o
+    // unico jeito de sair a tela certa, ja que o integration_test so entrega
+    // as imagens ao driver depois que o teste inteiro acaba.
+    //
+    // A espera logo depois do sinal e a janela do host para fotografar. O
+    // takeScreenshot no fim fica como rede de seguranca, caso o simctl falhe.
+    Future<void> capturar(String nome) async {
+      debugPrint('###CAPTURA:$nome');
+      await esperar(tester, segundos: 3);
+      await binding.takeScreenshot(nome);
+    }
+
     await tester.pumpWidget(const ZapBairroApp());
     await esperar(tester);
 
     // 1) Tela inicial: busca + grade de categorias.
-    await binding.takeScreenshot('01-inicio');
+    await capturar('01-inicio');
 
     // 2) Resultado de busca por texto. O termo vai sem acento de proposito,
     //    para a captura mostrar que "acai" encontra "Acai".
@@ -61,7 +74,7 @@ void main() {
       // morador faz, e nao depende de qual icone repete na tela.
       await tester.tap(find.byTooltip('Buscar'));
       await esperar(tester);
-      await binding.takeScreenshot('02-busca');
+      await capturar('02-busca');
     });
 
     // 3) Detalhes da loja: nota da vizinhanca, endereco, horario e contato.
@@ -75,7 +88,7 @@ void main() {
       await tester.tap(lojas.first);
       await esperar(tester);
       abriuLoja = true;
-      await binding.takeScreenshot('03-detalhes');
+      await capturar('03-detalhes');
     });
 
     // 4) Rodape dos detalhes: avaliacoes da vizinhanca e o botao de avaliar.
@@ -88,11 +101,11 @@ void main() {
       }
       await tester.ensureVisible(botaoAvaliar);
       await esperar(tester, segundos: 2);
-      await binding.takeScreenshot('04-avaliacoes');
+      await capturar('04-avaliacoes');
 
       await tester.tap(botaoAvaliar);
       await esperar(tester, segundos: 3);
-      await binding.takeScreenshot('05-avaliar');
+      await capturar('05-avaliar');
 
       final cancelar = find.text('Cancelar');
       if (cancelar.evaluate().isNotEmpty) {
@@ -117,7 +130,7 @@ void main() {
       }
       await tester.tap(categoria.first);
       await esperar(tester);
-      await binding.takeScreenshot('06-categorias');
+      await capturar('06-categorias');
     });
   });
 }
