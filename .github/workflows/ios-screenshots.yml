@@ -168,7 +168,9 @@ jobs:
             --batteryLevel 100 || true
 
       - name: Gerar as capturas
-        timeout-minutes: 30
+        # 25min: o build leva uns 6, o resto e o drive. O que passar disso e
+        # travamento, e os logs sobem no passo seguinte de qualquer jeito.
+        timeout-minutes: 25
         run: |
           set -euo pipefail
 
@@ -180,10 +182,61 @@ jobs:
           fi
           flutter config --enable-swift-package-manager
 
-          flutter drive \
+          mkdir -p logs
+
+          # O log do proprio simulador, em segundo plano. Se o app crashar ao
+          # abrir, o `flutter drive` nao reclama: ele fica esperando para
+          # sempre uma conexao que nao vem. Foi o run #5, 22 minutos calado
+          # depois do "Xcode build done". O motivo so aparece aqui.
+          xcrun simctl spawn "$SIMULADOR_UDID" log stream \
+            --style compact \
+            --predicate 'processImagePath CONTAINS "Runner" OR senderImagePath CONTAINS "Runner"' \
+            > logs/simulador.log 2>&1 &
+          log_pid=$!
+
+          # -v para saber em que etapa ele para. O tee guarda tudo, porque o
+          # passo pode morrer por timeout e levar o log da tela junto.
+          set +e
+          flutter drive -v \
             --driver=test_driver/integration_test.dart \
             --target=integration_test/capturas_test.dart \
-            -d "$SIMULADOR_UDID"
+            -d "$SIMULADOR_UDID" 2>&1 | tee logs/flutter-drive.log
+          status=${PIPESTATUS[0]}
+          set -e
+
+          kill "$log_pid" 2>/dev/null || true
+          exit "$status"
+
+      - name: Juntar os logs de diagnostico
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+
+          # Relatorios de crash do app dentro do simulador: e o que diz se ele
+          # morreu na abertura em vez de simplesmente nao conectar.
+          crashes="$HOME/Library/Logs/DiagnosticReports"
+          if [ -d "$crashes" ]; then
+            for c in "$crashes"/*Runner*; do
+              [ -e "$c" ] && cp "$c" logs/ || true
+            done
+          fi
+
+          if [ -n "${SIMULADOR_UDID:-}" ]; then
+            xcrun simctl list devices | grep "$SIMULADOR_UDID" > logs/estado-simulador.txt 2>&1 || true
+          fi
+
+          echo "Logs juntados:"
+          ls -la logs/ || true
+
+      - name: Publicar os logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-diagnostico
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Conferir o que saiu
         if: always()
