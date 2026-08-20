@@ -81,7 +81,11 @@ jobs:
       - name: Selecionar Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          # Mesmo motivo do workflow de capturas: "latest-stable" no runner
+          # macos-15 hoje entrega o Xcode 26, e a ultima build que a Apple
+          # aceitou saiu do Xcode 16. Nao vale trocar de toolchain no meio de
+          # uma submissao em revisao.
+          xcode-version: "^16.0"
 
       - name: Instalar Flutter
         uses: subosito/flutter-action@v2

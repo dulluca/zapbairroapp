@@ -7,6 +7,29 @@ pronto para copiar e onde colar cada parte.
 > em Belém (PA), com 228 comércios. O número vem de `lojistas.json` e o bairro
 > saiu dos endereços cadastrados. Se o alcance for outro, corrija as duas frases
 > antes de enviar — dado errado numa resposta à App Review custa caro.
+>
+> Conferido em 20/08/2026: `lojistas.json` tem 228 itens, a tela inicial tem 12
+> categorias, `kAdminSenha` continua `zapadmin2024` e a chamada da tela de
+> cadastro segue comentada em `lib/main.dart`. Os quatro números que a carta
+> afirma batem com o código.
+
+---
+
+## 0. O build que vai junto
+
+A carta descreve a busca reescrita e as avaliações da vizinhança como novidades
+desta build. **A build 6, que está no TestFlight, não tem nenhuma das duas.**
+Ela saiu do commit `9ee033c`, anterior ao `3f96548` ("Corrige a busca e torna as
+avaliacoes visiveis aos moradores"). Tem só a remoção do cadastro.
+
+Submeter a build 6 com esta carta é entregar ao revisor um texto que não
+corresponde ao app — o caminho mais curto para a terceira rejeição, agora com a
+credibilidade queimada.
+
+Antes de qualquer coisa, rode **"iOS - Build IPA (App Store)"** na `main` com os
+dois campos vazios. O número da build sai do número do run (será 7, maior que a
+6 e que a 5, que é o que a Apple exige) e a versão sai do `pubspec.yaml`
+(`1.0.0`, a mesma que está rejeitada e que aceita build nova).
 
 ---
 
@@ -66,11 +89,17 @@ Features you can test, in this order:
    category, then description).
 
 2. COMMUNITY RATINGS - NEW IN THIS BUILD
-   Open any business from the list. Below its name you will see the star
-   average and how many residents have rated it. The same average appears next
-   to every business in the directory list. At the bottom of the detail screen,
-   the section "Avaliacoes da vizinhanca" (neighborhood reviews) shows each
-   review with its star rating, comment and date.
+   Open any business from the list. The star average and the number of ratings
+   appear under its name, and the same average appears next to every business
+   in the directory list. At the bottom of the detail screen, the section
+   "Avaliacoes da vizinhanca" (neighborhood reviews) lists each review with its
+   star rating, comment and date.
+
+   The directory is new, so most businesses still read "Ainda sem avaliacoes -
+   seja o primeiro a avaliar" (no ratings yet - be the first to rate). Step 3
+   shows the feature working end to end: a rating you submit appears in that
+   section immediately and changes the average shown next to the business in
+   the directory list.
 
 3. SUBMIT A RATING - NEW IN THIS BUILD
    On the same detail screen, tap "Avaliar esta loja" (rate this business),
@@ -97,10 +126,11 @@ GUIDELINE 2.3.10 - SCREENSHOTS
 
 You are correct: the previous screenshots were captured on an Android device
 and showed the Android status bar. Every screenshot has been replaced with
-captures taken on an iPhone simulator running this exact build, showing the
-iOS status bar. They show the features listed above: the directory and search,
-the search results with community ratings, a business detail screen with its
-rating and neighborhood reviews, and the rating dialog.
+captures taken on an iPhone 16 Pro Max simulator running this build, showing
+the iOS status bar. In order, they show: the directory home screen with the
+search field and the categories, the results of a search for "acai", the
+detail screen of one business, the saved-favorites screen, the rating dialog,
+and the subcategories inside one category.
 
 
 HIDDEN ADMIN PANEL - FULL DISCLOSURE
@@ -147,7 +177,8 @@ What changed since build 1.0.0 (5):
 How to test in one minute:
 - Type "acai" in the search field on the first screen and tap the magnifier.
 - Open any result: the star average is under the name, the neighborhood
-  reviews are at the bottom.
+  reviews are at the bottom. The directory is new, so most businesses read
+  "Ainda sem avaliacoes" (no ratings yet) until you add one.
 - Tap "Avaliar esta loja", pick stars, tap "Enviar" - the review shows up
   immediately and the average updates.
 - Tap the heart on a business, then "FAVORITOS" on the home screen.
