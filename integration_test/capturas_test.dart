@@ -91,7 +91,13 @@ void main() {
       await capturar('03-detalhes');
     });
 
-    // 4) Rodape dos detalhes: avaliacoes da vizinhanca e o botao de avaliar.
+    // 4) Caixa de avaliacao, aberta pelo rodape dos detalhes.
+    //
+    // Aqui existia tambem uma captura "04-avaliacoes", do rodape da tela de
+    // detalhes. Ela saia identica a 03: numa tela de 6,9 polegadas os
+    // detalhes cabem inteiros, avaliacoes e botao incluidos, entao o
+    // ensureVisible nao tinha para onde rolar. O 04 virou a tela de
+    // favoritos, logo abaixo.
     await etapa('avaliar', () async {
       if (!abriuLoja) return;
       final botaoAvaliar = find.text('Avaliar esta loja');
@@ -101,7 +107,6 @@ void main() {
       }
       await tester.ensureVisible(botaoAvaliar);
       await esperar(tester, segundos: 2);
-      await capturar('04-avaliacoes');
 
       await tester.tap(botaoAvaliar);
       await esperar(tester, segundos: 3);
@@ -114,9 +119,47 @@ void main() {
       }
     });
 
-    // 5) Navegacao por categoria, a partir da tela inicial.
+    // 5) Favoritos com a loja guardada. De quebra, e o caminho de volta para
+    //    a tela inicial, que a etapa seguinte precisa.
+    var voltouParaHome = false;
+    await etapa('favoritos', () async {
+      if (!abriuLoja) return;
+
+      // Se a loja ja estivesse guardada o tooltip seria outro; nesse caso
+      // seguimos assim mesmo, que a tela de favoritos e o que interessa.
+      final guardar = find.byTooltip('Guardar nos favoritos');
+      if (guardar.evaluate().isNotEmpty) {
+        await tester.tap(guardar);
+        // A confirmacao some sozinha em 900ms: esperamos ela sair para nao
+        // aparecer atravessada na captura.
+        await esperar(tester, segundos: 2);
+      } else {
+        debugPrint('### coracao "Guardar nos favoritos" nao encontrado');
+      }
+
+      // Detalhes -> resultados da busca -> tela inicial.
+      await tester.pageBack();
+      await esperar(tester, segundos: 3);
+      await tester.pageBack();
+      await esperar(tester, segundos: 3);
+      voltouParaHome = true;
+
+      final botaoFavoritos = find.text('FAVORITOS');
+      if (botaoFavoritos.evaluate().isEmpty) {
+        debugPrint('### botao FAVORITOS nao encontrado');
+        return;
+      }
+      await tester.tap(botaoFavoritos.first);
+      await esperar(tester, segundos: 3);
+      await capturar('04-favoritos');
+
+      await tester.pageBack();
+      await esperar(tester, segundos: 3);
+    });
+
+    // 6) Navegacao por categoria, a partir da tela inicial.
     await etapa('categorias', () async {
-      if (abriuLoja) {
+      if (abriuLoja && !voltouParaHome) {
         await tester.pageBack();
         await esperar(tester, segundos: 3);
         await tester.pageBack();
