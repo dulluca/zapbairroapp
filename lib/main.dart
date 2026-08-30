@@ -11,6 +11,13 @@ import 'servicos.dart';
 // sensíveis aqui). Serve para esconder o painel de visitas de usuários comuns.
 const String kAdminSenha = "zapadmin2024";
 
+// Medidas dos dois botões da barra do topo (Utilidades/Emergências e Avisos
+// Comunitários). Ficam aqui porque a barra reserva o espaco do 'leading' a
+// partir delas: e o que mantem os dois botoes do mesmo tamanho e a mesma
+// distancia das bordas da tela.
+const double kLarguraBotaoBarra = 92;
+const double kMargemBotaoBarra = 12;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -83,22 +90,8 @@ class _TelaCategoriasState extends State<TelaCategorias> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    // DESATIVADO: cadastro de nome + WhatsApp no primeiro acesso.
-    // Para reabilitar, descomente a linha abaixo e o metodo _verificarCadastro,
-    // junto com a funcao mostrarCadastroMorador() mais abaixo neste arquivo.
-    // WidgetsBinding.instance.addPostFrameCallback((_) => _verificarCadastro());
-  }
-
-  // DESATIVADO junto com o dialogo de cadastro do morador.
-  // Future<void> _verificarCadastro() async {
-  //   final cadastrado = await MoradorService.estaCadastrado();
-  //   if (!cadastrado && mounted) {
-  //     await mostrarCadastroMorador(context);
-  //   }
-  // }
+  // O app abre direto no diretorio: nao ha cadastro, login nem conta em
+  // lugar nenhum, e toda funcao esta disponivel no primeiro toque.
 
   // Botão CONTATO: abre o WhatsApp oficial do ZapBairro.
   void _abrirContato() {
@@ -121,6 +114,82 @@ class _TelaCategoriasState extends State<TelaCategorias> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const TelaFavoritos()),
+    );
+  }
+
+  // Botão EMERGÊNCIA (canto esquerdo da barra): telefones de urgência.
+  void _abrirEmergencia() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaEmergencia()),
+    );
+  }
+
+  // Botão AVISOS (canto direito da barra): recados do bairro.
+  void _abrirAvisos() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaAvisos()),
+    );
+  }
+
+  // Botão quadrado da barra do topo (ícone colorido + rótulo embaixo).
+  Widget _botaoDaBarra({
+    required IconData icone,
+    required String label,
+    required Color cor,
+    required VoidCallback onTap,
+  }) {
+    // O Center é obrigatório: o AppBar estica os widgets de 'actions' na
+    // altura toda da barra (CrossAxisAlignment.stretch) mas centraliza o
+    // 'leading'. Sem ele, o botão da direita nasce colado no topo e fica
+    // desalinhado com o da esquerda.
+    //
+    // Semantics(button): o leitor de tela já lê o rótulo pelo Text; aqui só
+    // avisamos que aquilo é um botão, e não um texto solto na barra.
+    return Center(
+      child: Semantics(
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: cor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Icon(icone, color: Colors.white, size: 20),
+              ),
+              const SizedBox(height: 3),
+              // Os rótulos são compridos para o canto da barra, então vêm com
+              // a quebra de linha já marcada no texto ('\n'). A largura fixa
+              // (a mesma dos dois botões) deixa os dois com o mesmo tamanho e
+              // impede que um nome grande empurre o título ZapBairro do meio.
+              SizedBox(
+                width: kLarguraBotaoBarra,
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8.5,
+                    height: 1.15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -275,6 +344,7 @@ class _TelaCategoriasState extends State<TelaCategorias> {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 72,
         title: GestureDetector(
           onLongPress: () => _abrirPortaoAdmin(context),
           child: const Text(
@@ -284,6 +354,25 @@ class _TelaCategoriasState extends State<TelaCategorias> {
         ),
         backgroundColor: Colors.green[700],
         centerTitle: true,
+        // O 'leading' e centralizado dentro da largura reservada, entao ela
+        // precisa ser a largura do botao mais margem dos DOIS lados; so assim
+        // a folga da esquerda fica igual ao SizedBox que fecha o 'actions'.
+        leadingWidth: kLarguraBotaoBarra + kMargemBotaoBarra * 2,
+        leading: _botaoDaBarra(
+          icone: Icons.health_and_safety,
+          label: 'UTILIDADES/\nEMERGÊNCIAS',
+          cor: Colors.red[600]!,
+          onTap: _abrirEmergencia,
+        ),
+        actions: [
+          _botaoDaBarra(
+            icone: Icons.campaign,
+            label: 'AVISOS\nCOMUNITÁRIOS',
+            cor: Colors.green[900]!,
+            onTap: _abrirAvisos,
+          ),
+          const SizedBox(width: kMargemBotaoBarra),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -930,7 +1019,7 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
                 ),
                 icon: const Icon(Icons.chat),
                 label: const Text(
-                  'WhatsApp - Atendimento Geral',
+                  'Falar com a loja',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 onPressed: () => abrirWhatsApp(tel1.toString()),
@@ -950,7 +1039,7 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
                 ),
                 icon: const Icon(Icons.chat),
                 label: const Text(
-                  'WhatsApp - Pedidos / Suporte',
+                  'Pedidos e suporte',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 onPressed: () => abrirWhatsApp(tel2.toString()),
@@ -998,7 +1087,7 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
     }
   }
 
-  // Botão de avaliar + o que a vizinhança já escreveu sobre esta loja.
+  // Botão de avaliar + o retrato das notas que a loja recebeu da vizinhança.
   Widget _secaoAvaliacoes(String nome) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1025,8 +1114,8 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
           onPressed: _avaliarEstaLoja,
         ),
         const SizedBox(height: 16),
-        StreamBuilder<List<Map<String, dynamic>>>(
-          stream: AvaliacaoService.daLoja(nome),
+        StreamBuilder<Map<String, ResumoAvaliacoes>>(
+          stream: AvaliacaoService.resumoPorLoja(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Padding(
@@ -1035,8 +1124,15 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
               );
             }
 
-            final avaliacoes = snapshot.data ?? const [];
-            if (avaliacoes.isEmpty) {
+            final resumo =
+                (snapshot.data ??
+                    const <
+                      String,
+                      ResumoAvaliacoes
+                    >{})[AvaliacaoService.chaveLojaAvaliada(nome)] ??
+                ResumoAvaliacoes.vazio;
+
+            if (!resumo.temAvaliacao) {
               return Text(
                 'Nenhum morador avaliou esta loja ainda. '
                 'Se você já foi atendido aqui, deixe sua nota para ajudar a vizinhança.',
@@ -1044,51 +1140,112 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
               );
             }
 
-            return Column(children: avaliacoes.map(_cartaoAvaliacao).toList());
+            return _distribuicaoNotas(resumo);
+          },
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Últimas notas recebidas',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: AvaliacaoService.daLoja(nome),
+          builder: (context, snapshot) {
+            final avaliacoes = snapshot.data ?? const [];
+            if (avaliacoes.isEmpty) {
+              return Text(
+                'A primeira nota desta loja pode ser a sua.',
+                style: TextStyle(color: Colors.grey[600]),
+              );
+            }
+            // So as mais recentes: a lista inteira nao acrescenta nada e
+            // deixaria a tela de detalhes rolando sem fim.
+            return Column(
+              children: avaliacoes.take(5).map(_cartaoAvaliacao).toList(),
+            );
           },
         ),
       ],
     );
   }
 
+  // Quantas notas de cada estrela a loja recebeu, em barras proporcionais.
+  Widget _distribuicaoNotas(ResumoAvaliacoes resumo) {
+    final maior = [
+      for (var nota = 1; nota <= 5; nota++) resumo.quantidadeDaNota(nota),
+    ].reduce((a, b) => a > b ? a : b);
+
+    return Column(
+      children: [
+        for (var nota = 5; nota >= 1; nota--)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Row(
+                    children: [
+                      Text(
+                        '$nota',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.star, size: 14, color: Colors.amber[700]),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: maior == 0
+                          ? 0
+                          : resumo.quantidadeDaNota(nota) / maior,
+                      minHeight: 10,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.amber[700]!,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 30,
+                  child: Text(
+                    '${resumo.quantidadeDaNota(nota)}',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _cartaoAvaliacao(Map<String, dynamic> avaliacao) {
     final nota = (avaliacao['nota'] as num?)?.toDouble() ?? 0;
-    final comentario = (avaliacao['comentario'] ?? '').toString().trim();
-    final autor = (avaliacao['moradorNome'] ?? '').toString().trim();
     final quando = _formatarData(avaliacao['criadoEm']);
 
     return Card(
       elevation: 0,
       color: Colors.grey[100],
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
           children: [
-            Row(
-              children: [
-                EstrelasNota(nota: nota, tamanho: 18),
-                const Spacer(),
-                if (quando.isNotEmpty)
-                  Text(
-                    quando,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-              ],
-            ),
-            if (comentario.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(comentario, style: const TextStyle(height: 1.4)),
-            ],
-            if (autor.isNotEmpty) ...[
-              const SizedBox(height: 6),
+            EstrelasNota(nota: nota, tamanho: 18),
+            const Spacer(),
+            if (quando.isNotEmpty)
               Text(
-                '- $autor',
-                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                quando,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
-            ],
           ],
         ),
       ),
@@ -1347,109 +1504,6 @@ class _BotaoFavoritoState extends State<BotaoFavorito> {
 }
 
 // =====================================================================
-// CADASTRO DO MORADOR (primeiro acesso): captura nome + WhatsApp.
-//
-// DESATIVADO: por enquanto nao coletamos nome nem WhatsApp do morador.
-// O codigo abaixo fica comentado para podermos reabilitar depois; nesse
-// caso, descomente tambem a chamada em _TelaCategoriasState.initState().
-// =====================================================================
-/*
-Future<void> mostrarCadastroMorador(BuildContext context) async {
-  final nomeCtrl = TextEditingController();
-  final telCtrl = TextEditingController();
-  final formKey = GlobalKey<FormState>();
-
-  await showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      bool salvando = false;
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          Future<void> salvar() async {
-            if (!formKey.currentState!.validate()) return;
-            setDialogState(() => salvando = true);
-            await MoradorService.salvar(nomeCtrl.text, telCtrl.text);
-            if (dialogContext.mounted) Navigator.pop(dialogContext);
-          }
-
-          return AlertDialog(
-            title: const Text('Bem-vindo ao ZapBairro!'),
-            content: Form(
-              key: formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Faça um cadastro rápido para começar a usar o app.',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: nomeCtrl,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(
-                      labelText: 'Seu nome',
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Informe seu nome'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: telCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'WhatsApp (com DDD)',
-                      hintText: 'Ex.: 91 98555 4004',
-                      hintStyle: TextStyle(color: Colors.black26),
-                      helperText: 'Digite DDD + número (só números)',
-                      prefixIcon: Icon(Icons.phone),
-                    ),
-                    validator: (v) {
-                      final digitos = (v ?? '').replaceAll(
-                        RegExp(r'[^0-9]'),
-                        '',
-                      );
-                      if (digitos.length < 10) {
-                        return 'Informe um WhatsApp válido com DDD';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: salvando ? null : salvar,
-                child: salvando
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Começar'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
-*/
-
-// =====================================================================
 // TELA FAVORITOS: lista as lojas que o morador guardou.
 // =====================================================================
 class TelaFavoritos extends StatefulWidget {
@@ -1560,7 +1614,7 @@ class _TelaFavoritosState extends State<TelaFavoritos> {
 }
 
 // =====================================================================
-// TELA AVALIAÇÃO: morador escolhe uma loja recente e dá nota + comentário.
+// TELA AVALIAÇÃO: morador busca ou escolhe uma loja recente e dá a nota.
 // =====================================================================
 class TelaAvaliacao extends StatefulWidget {
   const TelaAvaliacao({super.key});
@@ -1571,11 +1625,55 @@ class TelaAvaliacao extends StatefulWidget {
 
 class _TelaAvaliacaoState extends State<TelaAvaliacao> {
   late Future<List<Map<String, dynamic>>> _futuro;
+  final _controladorBusca = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _futuro = RecentesService.listar();
+  }
+
+  @override
+  void dispose() {
+    _controladorBusca.dispose();
+    super.dispose();
+  }
+
+  // Sem esta busca a tela so servia a quem ja tinha aberto alguma loja: quem
+  // instalou agora caia num aviso de lista vazia e nao tinha o que fazer aqui.
+  void _buscarLoja() {
+    final termo = _controladorBusca.text.trim();
+    if (termo.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaComercios(categoriaNome: '', termoBusca: termo),
+      ),
+    );
+  }
+
+  Widget _campoBusca() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: TextField(
+        controller: _controladorBusca,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _buscarLoja(),
+        decoration: InputDecoration(
+          hintText: 'Procure a loja que você quer avaliar',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: IconButton(
+            tooltip: 'Buscar loja',
+            icon: Icon(Icons.arrow_forward, color: Colors.green[700]),
+            onPressed: _buscarLoja,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
+        ),
+      ),
+    );
   }
 
   Future<void> _avaliar(Map<String, dynamic> loja) async {
@@ -1609,35 +1707,46 @@ class _TelaAvaliacaoState extends State<TelaAvaliacao> {
           }
           final recentes = snapshot.data ?? [];
           if (recentes.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.store_mall_directory_outlined,
-                      size: 60,
-                      color: Colors.grey,
+            return Column(
+              children: [
+                _campoBusca(),
+                const Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.store_mall_directory_outlined,
+                            size: 60,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Busque a loja acima para dar sua nota.\nAs lojas que você abrir também aparecem aqui.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Você ainda não visitou nenhuma loja.\nAbra uma loja para poder avaliá-la aqui.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             );
           }
           return Column(
             children: [
+              _campoBusca(),
               const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Escolha a loja que você quer avaliar:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Ou escolha uma das lojas que você abriu:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               Expanded(
@@ -1686,7 +1795,6 @@ class _DialogoAvaliacao extends StatefulWidget {
 
 class _DialogoAvaliacaoState extends State<_DialogoAvaliacao> {
   int _nota = 0;
-  final _comentarioCtrl = TextEditingController();
   bool _enviando = false;
 
   Future<void> _enviar() async {
@@ -1698,11 +1806,7 @@ class _DialogoAvaliacaoState extends State<_DialogoAvaliacao> {
     }
     setState(() => _enviando = true);
     try {
-      await AvaliacaoService.enviar(
-        loja: widget.loja,
-        nota: _nota,
-        comentario: _comentarioCtrl.text,
-      );
+      await AvaliacaoService.enviar(loja: widget.loja, nota: _nota);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -1739,14 +1843,11 @@ class _DialogoAvaliacaoState extends State<_DialogoAvaliacao> {
               );
             }),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _comentarioCtrl,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Comentário (opcional)',
-              border: OutlineInputBorder(),
-            ),
+          const SizedBox(height: 8),
+          Text(
+            'Sua nota entra na média da loja e aparece para toda a vizinhança.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -2005,15 +2106,6 @@ class TelaAvaliacoesAdmin extends StatelessWidget {
                     final loja = (dados['comercioNome'] ?? 'Loja').toString();
                     final notaRaw = dados['nota'];
                     final int nota = notaRaw is num ? notaRaw.toInt() : 0;
-                    final comentario = (dados['comentario'] ?? '')
-                        .toString()
-                        .trim();
-                    final moradorNome = (dados['moradorNome'] ?? '')
-                        .toString()
-                        .trim();
-                    final moradorTel = (dados['moradorTelefone'] ?? '')
-                        .toString()
-                        .trim();
                     final data = _formatarData(dados['criadoEm']);
 
                     return Card(
@@ -2056,56 +2148,6 @@ class TelaAvaliacoesAdmin extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (comentario.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                '"$comentario"',
-                                style: const TextStyle(
-                                  fontStyle: FontStyle.italic,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                            if (moradorNome.isNotEmpty ||
-                                moradorTel.isNotEmpty) ...[
-                              const Divider(height: 18),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.person,
-                                    size: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      [
-                                        if (moradorNome.isNotEmpty) moradorNome,
-                                        if (moradorTel.isNotEmpty) moradorTel,
-                                      ].join(' • '),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ),
-                                  if (moradorTel.isNotEmpty)
-                                    IconButton(
-                                      tooltip: 'Falar no WhatsApp',
-                                      icon: const Icon(
-                                        Icons.chat,
-                                        color: Colors.green,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => abrirWhatsAppNumeroCompleto(
-                                        moradorTel,
-                                        mensagem:
-                                            'Olá! Aqui é do ZapBairro, sobre sua avaliação.',
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -2114,6 +2156,285 @@ class TelaAvaliacoesAdmin extends StatelessWidget {
                 ),
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// Cabeçalho de uma seção (ex.: "Serviços públicos") dentro das listas de
+// Utilidades/Emergências e Avisos Comunitários.
+class _TituloSecao extends StatelessWidget {
+  final String texto;
+  final Color cor;
+
+  const _TituloSecao(this.texto, this.cor);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 10),
+      child: Row(
+        children: [
+          Container(width: 4, height: 20, color: cor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              texto.toUpperCase(),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.4,
+                color: cor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Aviso de lista vazia, igual nas duas telas.
+class _ListaVazia extends StatelessWidget {
+  final IconData icone;
+  final String texto;
+
+  const _ListaVazia(this.icone, this.texto);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icone, size: 60, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(
+              texto,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// TELA UTILIDADES / EMERGÊNCIAS: telefones úteis do bairro agrupados por
+// seção (emergências 24h, serviços públicos, apoio social, concessionárias),
+// com um toque para ligar. A lista sai de lojistas.json ("emergencia") e
+// chega aqui pela coleção 'emergencias' do Firestore.
+// =====================================================================
+class TelaEmergencia extends StatelessWidget {
+  const TelaEmergencia({super.key});
+
+  Future<void> _ligar(BuildContext context, String numero) async {
+    final abriu = await abrirDiscador(numero);
+    if (!abriu && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Não foi possível ligar. Disque $numero.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _cartao(BuildContext context, Map<String, dynamic> contato) {
+    final nome = (contato['nome'] ?? '').toString();
+    final descricao = (contato['descricao'] ?? '').toString();
+    final telefone = (contato['telefone'] ?? '').toString().trim();
+    // Sem telefone cadastrado o cartão continua na lista (o morador ainda vê
+    // que o serviço existe), só não oferece o botão de ligar.
+    final temTelefone = telefone.isNotEmpty;
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: temTelefone ? Colors.red[600] : Colors.grey[400],
+          child: const Icon(Icons.emergency, color: Colors.white),
+        ),
+        title: Text(
+          nome.isEmpty ? 'Sem nome' : nome,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (descricao.isNotEmpty) Text(descricao),
+            const SizedBox(height: 4),
+            Text(
+              temTelefone ? telefone : 'Telefone ainda não cadastrado',
+              style: TextStyle(
+                fontSize: temTelefone ? 16 : 13,
+                fontWeight: temTelefone ? FontWeight.bold : FontWeight.normal,
+                color: temTelefone ? Colors.red[700] : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        trailing: temTelefone
+            ? IconButton(
+                icon: Icon(Icons.call, color: Colors.red[700], size: 30),
+                tooltip: 'Ligar para $nome',
+                onPressed: () => _ligar(context, telefone),
+              )
+            : null,
+        onTap: temTelefone ? () => _ligar(context, telefone) : null,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Utilidades / Emergências',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.red[700],
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: ConteudoBairroService.emergencias(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final contatos = snapshot.data ?? [];
+          if (contatos.isEmpty) {
+            return const _ListaVazia(
+              Icons.health_and_safety_outlined,
+              'Nenhum telefone cadastrado ainda.',
+            );
+          }
+
+          final secoes = agruparPorSecao(contatos);
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            itemCount: secoes.length,
+            itemBuilder: (context, index) {
+              final secao = secoes[index];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (secao.key.isNotEmpty)
+                    _TituloSecao(secao.key, Colors.red[700]!),
+                  ...secao.value.map((c) => _cartao(context, c)),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// TELA AVISOS COMUNITÁRIOS: o mural do bairro (achados e perdidos, alertas
+// da vizinhança, doações, classificados), agrupado por seção. A lista sai de
+// lojistas.json ("avisos") e chega aqui pela coleção 'avisos' do Firestore.
+// =====================================================================
+class TelaAvisos extends StatelessWidget {
+  const TelaAvisos({super.key});
+
+  Widget _cartao(Map<String, dynamic> aviso) {
+    final titulo = (aviso['titulo'] ?? '').toString();
+    final mensagem = (aviso['mensagem'] ?? '').toString();
+    final data = dataParaExibicao(aviso['data']);
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.campaign, color: Colors.green[700]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    titulo.isEmpty ? 'Aviso' : titulo,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (data.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                data,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+            if (mensagem.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(mensagem, style: const TextStyle(fontSize: 15)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Avisos Comunitários',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.green[700],
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: ConteudoBairroService.avisos(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final avisos = snapshot.data ?? [];
+          if (avisos.isEmpty) {
+            return const _ListaVazia(
+              Icons.campaign_outlined,
+              'Nenhum aviso no bairro por enquanto.',
+            );
+          }
+
+          final secoes = agruparPorSecao(avisos);
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            itemCount: secoes.length,
+            itemBuilder: (context, index) {
+              final secao = secoes[index];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (secao.key.isNotEmpty)
+                    _TituloSecao(secao.key, Colors.green[800]!),
+                  ...secao.value.map(_cartao),
+                ],
+              );
+            },
           );
         },
       ),

@@ -24,6 +24,95 @@ Future<void> abrirWhatsAppNumeroCompleto(
   }
 }
 
+// --- Utilitario: abrir o discador do celular com um numero ja preenchido ---
+// Usado nos telefones de emergencia, onde o morador precisa ligar (nao mandar
+// mensagem) e muitas vezes o numero e curto (192, 193, 190...).
+Future<bool> abrirDiscador(String numero) async {
+  final numeroLimpo = numero.replaceAll(RegExp(r'[^0-9+]'), '');
+  if (numeroLimpo.isEmpty) return false;
+  final url = Uri(scheme: 'tel', path: numeroLimpo);
+  try {
+    return await launchUrl(url, mode: LaunchMode.externalApplication);
+  } catch (e) {
+    debugPrint('Não foi possível abrir o discador: $e');
+    return false;
+  }
+}
+
+// =====================================================================
+// EMERGENCIA e AVISOS: as duas listas que o ZapBairro publica para o
+// bairro. Sao editadas em lojistas.json e sobem para o Firestore pelo
+// importar.dart, junto com os comercios.
+// =====================================================================
+class ConteudoBairroService {
+  /// Telefones de emergencia, na ordem definida no JSON (campo 'ordem').
+  ///
+  /// Ordenamos no app para nao depender de indice do Firestore: registros
+  /// sem 'ordem' vao para o fim, e ai vale a ordem alfabetica do nome.
+  static Stream<List<Map<String, dynamic>>> emergencias() {
+    return FirebaseFirestore.instance
+        .collection('emergencias')
+        .snapshots()
+        .map((snapshot) {
+          final lista = snapshot.docs.map((d) => d.data()).toList();
+          lista.sort((a, b) {
+            final ordemA = (a['ordem'] as num?)?.toInt() ?? 9999;
+            final ordemB = (b['ordem'] as num?)?.toInt() ?? 9999;
+            if (ordemA != ordemB) return ordemA.compareTo(ordemB);
+            return (a['nome'] ?? '').toString().compareTo(
+              (b['nome'] ?? '').toString(),
+            );
+          });
+          return lista;
+        });
+  }
+
+  /// Avisos do bairro, na ordem do JSON. Entre avisos de mesma 'ordem' vale
+  /// a data mais nova primeiro (campo 'data', no formato AAAA-MM-DD, que
+  /// ordena certo como texto). Aviso sem data fica no fim do proprio grupo.
+  static Stream<List<Map<String, dynamic>>> avisos() {
+    return FirebaseFirestore.instance.collection('avisos').snapshots().map((
+      snapshot,
+    ) {
+      final lista = snapshot.docs.map((d) => d.data()).toList();
+      lista.sort((a, b) {
+        final ordemA = (a['ordem'] as num?)?.toInt() ?? 9999;
+        final ordemB = (b['ordem'] as num?)?.toInt() ?? 9999;
+        if (ordemA != ordemB) return ordemA.compareTo(ordemB);
+        return (b['data'] ?? '').toString().compareTo(
+          (a['data'] ?? '').toString(),
+        );
+      });
+      return lista;
+    });
+  }
+}
+
+/// Quebra uma lista ja ordenada em blocos por 'secao', preservando a ordem de
+/// aparicao das secoes. As telas de emergencia e avisos desenham um titulo
+/// por bloco; quem nao tem secao cai num bloco de titulo vazio.
+List<MapEntry<String, List<Map<String, dynamic>>>> agruparPorSecao(
+  List<Map<String, dynamic>> itens,
+) {
+  final grupos = <String, List<Map<String, dynamic>>>{};
+  for (final item in itens) {
+    final secao = (item['secao'] ?? '').toString().trim();
+    grupos.putIfAbsent(secao, () => []).add(item);
+  }
+  return grupos.entries.toList();
+}
+
+/// Converte "2026-08-29" em "29/08/2026". Se vier em outro formato, devolve
+/// o texto como esta (o JSON e editado a mao, entao nao vale quebrar a tela).
+String dataParaExibicao(Object? data) {
+  final texto = (data ?? '').toString().trim();
+  final partes = texto.split('-');
+  if (partes.length == 3 && partes[0].length == 4) {
+    return '${partes[2]}/${partes[1]}/${partes[0]}';
+  }
+  return texto;
+}
+
 // Gera uma chave estavel para uma loja (usa o id do documento quando existir,
 // senao cai para o nome normalizado). Serve para favoritos e recentes.
 String chaveLoja(Map<String, dynamic> loja) {
@@ -47,55 +136,6 @@ Map<String, dynamic> resumoLoja(Map<String, dynamic> dados, {String? id}) {
     'categoria': dados['categoria'] ?? '',
     'subcategoria': dados['subcategoria'] ?? '',
   };
-}
-
-// =====================================================================
-// MORADOR: cadastro capturado no primeiro acesso (nome + WhatsApp).
-// Fica salvo localmente e tambem no Firestore (colecao 'moradores').
-//
-// ATENCAO: o dialogo de cadastro esta DESATIVADO (ver mostrarCadastroMorador
-// em main.dart), portanto nada e coletado e dados() devolve strings vazias.
-// O servico continua aqui para quando/se voltarmos a pedir nome + WhatsApp.
-// =====================================================================
-class MoradorService {
-  static const _kNome = 'morador_nome';
-  static const _kTelefone = 'morador_telefone';
-
-  static Future<bool> estaCadastrado() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tel = prefs.getString(_kTelefone) ?? '';
-    return tel.trim().isNotEmpty;
-  }
-
-  static Future<Map<String, String>> dados() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'nome': prefs.getString(_kNome) ?? '',
-      'telefone': prefs.getString(_kTelefone) ?? '',
-    };
-  }
-
-  // Telefone so com digitos, usado como id do morador no Firestore.
-  static String telefoneDigitos(String telefone) =>
-      telefone.replaceAll(RegExp(r'[^0-9]'), '');
-
-  static Future<void> salvar(String nome, String telefone) async {
-    final prefs = await SharedPreferences.getInstance();
-    final tel = telefoneDigitos(telefone);
-    await prefs.setString(_kNome, nome.trim());
-    await prefs.setString(_kTelefone, tel);
-
-    try {
-      await FirebaseFirestore.instance.collection('moradores').doc(tel).set({
-        'nome': nome.trim(),
-        'telefone': tel,
-        'criadoEm': FieldValue.serverTimestamp(),
-        'plataforma': 'android',
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Não foi possível salvar o morador no Firestore: $e');
-    }
-  }
 }
 
 // =====================================================================
@@ -192,34 +232,38 @@ class FavoritosService {
 }
 
 // =====================================================================
-// AVALIACOES: nota (1..5) + comentario de uma loja, salvos no Firestore.
+// AVALIACOES: nota de 1 a 5 estrelas de uma loja, salva no Firestore.
+//
+// So a nota. Nao ha campo de texto livre nem qualquer identificacao de quem
+// avaliou, entao a colecao nao guarda conteudo escrito por usuario nem dado
+// que identifique o morador.
 // =====================================================================
-/// Media e quantidade de avaliacoes de uma loja.
+/// Media, quantidade e distribuicao das avaliacoes de uma loja.
 class ResumoAvaliacoes {
   final double media;
   final int total;
 
-  const ResumoAvaliacoes(this.media, this.total);
+  /// Quantas avaliacoes cada nota recebeu. Chaves de 1 a 5.
+  final Map<int, int> porNota;
+
+  const ResumoAvaliacoes(this.media, this.total, [this.porNota = const {}]);
 
   static const ResumoAvaliacoes vazio = ResumoAvaliacoes(0, 0);
 
   bool get temAvaliacao => total > 0;
+
+  int quantidadeDaNota(int nota) => porNota[nota] ?? 0;
 }
 
 class AvaliacaoService {
   static Future<void> enviar({
     required Map<String, dynamic> loja,
     required int nota,
-    String comentario = '',
   }) async {
-    final morador = await MoradorService.dados();
     await FirebaseFirestore.instance.collection('avaliacoes').add({
       'comercioId': (loja['id'] ?? '').toString(),
       'comercioNome': (loja['nome'] ?? '').toString(),
       'nota': nota,
-      'comentario': comentario.trim(),
-      'moradorTelefone': morador['telefone'] ?? '',
-      'moradorNome': morador['nome'] ?? '',
       'criadoEm': FieldValue.serverTimestamp(),
     });
   }
@@ -237,6 +281,7 @@ class AvaliacaoService {
     ) {
       final somas = <String, int>{};
       final totais = <String, int>{};
+      final distribuicoes = <String, Map<int, int>>{};
 
       for (final doc in snapshot.docs) {
         final dados = doc.data();
@@ -246,6 +291,8 @@ class AvaliacaoService {
 
         somas[chave] = (somas[chave] ?? 0) + nota;
         totais[chave] = (totais[chave] ?? 0) + 1;
+        final distribuicao = distribuicoes.putIfAbsent(chave, () => <int, int>{});
+        distribuicao[nota] = (distribuicao[nota] ?? 0) + 1;
       }
 
       return {
@@ -253,6 +300,7 @@ class AvaliacaoService {
           chave: ResumoAvaliacoes(
             somas[chave]! / totais[chave]!,
             totais[chave]!,
+            distribuicoes[chave] ?? const <int, int>{},
           ),
       };
     });
@@ -303,15 +351,13 @@ class EspecialidadeService {
   }) async {
     final esp = especialidade.trim();
     if (esp.isEmpty) return;
-    final morador = await MoradorService.dados();
     final fs = FirebaseFirestore.instance;
     try {
-      // Log detalhado (um documento por acesso).
+      // Log detalhado (um documento por acesso). Sem nada do morador: o
+      // registro diz o que foi aberto, nunca por quem.
       await fs.collection('acessos_especialidade').add({
         'especialidade': esp,
         'categoria': categoria,
-        'moradorTelefone': morador['telefone'] ?? '',
-        'moradorNome': morador['nome'] ?? '',
         'criadoEm': FieldValue.serverTimestamp(),
       });
       // Contador agregado (facilita o ranking no painel).

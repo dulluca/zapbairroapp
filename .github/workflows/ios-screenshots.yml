@@ -113,6 +113,9 @@ jobs:
           xcrun simctl bootstatus "$udid" -b
 
           # Relogio 9:41 e sinal/bateria cheios, como nas capturas da Apple.
+          # So aparece se alguem tirar print do simulador na mao: as capturas
+          # deste workflow vem da superficie do Flutter, que nao inclui a barra
+          # de status do iOS (ver o comentario em test_driver/integration_test.dart).
           xcrun simctl status_bar "$udid" override \
             --time "9:41" \
             --cellularMode active \
@@ -147,10 +150,45 @@ jobs:
             echo "::error::Nenhuma captura foi gerada. Veja o log do passo anterior."
             exit 1
           fi
+          # Medidas que o App Store Connect aceita no slot de iPhone. Se a
+          # captura sair fora delas, o upload e recusado no site -- melhor
+          # descobrir aqui do que depois de baixar o artefato.
+          aceitas="1320x2868 1290x2796 1284x2778 1242x2688"
+
           echo "Capturas geradas:"
+          fora=""
           for img in screenshots/*.png; do
-            tamanho=$(sips -g pixelWidth -g pixelHeight "$img" | awk '/pixel/ {printf "%s ", $2}')
-            echo "  $(basename "$img") -> ${tamanho}px"
+            largura=$(sips -g pixelWidth "$img" | awk '/pixelWidth/ {print $2}')
+            altura=$(sips -g pixelHeight "$img" | awk '/pixelHeight/ {print $2}')
+            medida="${largura}x${altura}"
+            echo "  $(basename "$img") -> ${medida}px"
+            case " $aceitas " in
+              *" $medida "*) ;;
+              *) fora="$fora $(basename "$img")($medida)" ;;
+            esac
+          done
+
+          if [ -n "$fora" ]; then
+            echo "::warning::Fora das medidas de iPhone da App Store ($aceitas):$fora. Rode de novo escolhendo um simulador Pro Max."
+          fi
+
+          # As capturas que o teste tenta gerar, na ordem. Uma faltando
+          # significa que aquele grupo falhou ou foi pulado no simulador --
+          # o log do passo "Gerar as capturas" diz o motivo exato.
+          esperadas="01-inicio 02-busca 03-detalhes 04-avaliacoes 05-avaliar 06-especialidades 07-favoritos 08-utilidades-emergencias 09-avisos-comunitarios"
+          for nome in $esperadas; do
+            if [ ! -f "screenshots/$nome.png" ]; then
+              echo "::warning::Captura esperada nao saiu: $nome.png (o grupo dela falhou ou foi pulado; veja o log do drive)."
+            fi
+          done
+
+          # Duas capturas identicas byte a byte = print repetido (a tela nao
+          # mudou antes da foto). O driver ja avisa na hora; aqui e a rede de
+          # seguranca caso o log do drive tenha passado despercebido.
+          duplicadas=$(shasum screenshots/*.png | sort | awk '{print $1}' | uniq -d)
+          for hash in $duplicadas; do
+            iguais=$(shasum screenshots/*.png | awk -v h="$hash" '$1==h {print $2}' | tr '\n' ' ')
+            echo "::warning::Capturas identicas (tela repetida): $iguais"
           done
 
       - name: Publicar as capturas como artefato

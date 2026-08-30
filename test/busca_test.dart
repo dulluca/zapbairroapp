@@ -3,16 +3,16 @@
 // Antes, a busca era um prefixo exato do Firestore sobre o campo 'nome' — como
 // os nomes começam com o conjunto ("MAGUARI - ...") e vêm em maiúsculas com
 // acento, praticamente nenhum termo digitado pelo morador achava resultado.
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zapbairro/conteudo_json.dart';
 import 'package:zapbairro/main.dart';
 
 void main() {
-  final lojistas =
-      (jsonDecode(File('lojistas.json').readAsStringSync()) as List)
-          .cast<Map<String, dynamic>>();
+  final lojistas = lerConteudoZapBairro(
+    File('lojistas.json').readAsStringSync(),
+  ).lojistas;
 
   List<Map<String, dynamic>> buscar(String termo) {
     final palavras = palavrasDaBusca(termo);
