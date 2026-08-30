@@ -3,12 +3,38 @@
 A build 1.0.0 (5) foi rejeitada em três diretrizes. Este documento tem o texto
 pronto para copiar, onde colar cada parte e o que conferir antes de reenviar.
 
-> **Confira o número de comércios antes de enviar.** O texto abaixo diz "cerca
-> de 140". Esse número veio de `lojistas.json`: são 228 registros, mas só 138
-> **nomes distintos** — e as telas do app deduplicam pelo nome, então o morador
-> vê ~138, não 228. A fonte de verdade é a coleção `comercios` no Firestore, não
-> o arquivo. Confira lá e ajuste a frase se estiver diferente. Número errado numa
-> resposta à App Review custa caro.
+> **Confira antes de enviar:** o texto afirma que o app cobre o Conjunto Maguari,
+> em Belém (PA), com 228 comércios. O número vem de `lojistas.json` e o bairro
+> saiu dos endereços cadastrados. Se o alcance for outro, corrija as duas frases
+> antes de enviar — dado errado numa resposta à App Review custa caro.
+>
+> **Atenção ao contar comércios:** `lojistas.json` tem 228 registros, mas só
+> ~138 **nomes distintos** — e as telas do app deduplicam pelo nome, então o
+> revisor vê ~138 na lista, não 228. Se a carta citar um número, cite o que a
+> tela mostra. A fonte de verdade é a coleção `comercios` no Firestore.
+>
+> Conferido em 20/08/2026: `lojistas.json` tem 228 itens, a tela inicial tem 12
+> categorias, `kAdminSenha` continua `zapadmin2024` e a chamada da tela de
+> cadastro segue comentada em `lib/main.dart`. Os quatro números que a carta
+> afirma batem com o código.
+
+---
+
+## 0. O build que vai junto
+
+A carta descreve a busca reescrita e as avaliações da vizinhança como novidades
+desta build. **A build 6, que está no TestFlight, não tem nenhuma das duas.**
+Ela saiu do commit `9ee033c`, anterior ao `3f96548` ("Corrige a busca e torna as
+avaliacoes visiveis aos moradores"). Tem só a remoção do cadastro.
+
+Submeter a build 6 com esta carta é entregar ao revisor um texto que não
+corresponde ao app — o caminho mais curto para a terceira rejeição, agora com a
+credibilidade queimada.
+
+Antes de qualquer coisa, rode **"iOS - Build IPA (App Store)"** na `main` com os
+dois campos vazios. O número da build sai do número do run (será 7, maior que a
+6 e que a 5, que é o que a Apple exige) e a versão sai do `pubspec.yaml`
+(`1.0.0`, a mesma que está rejeitada e que aceita build nova).
 
 ---
 
@@ -84,10 +110,20 @@ Please test, in this order:
    accents and case (that is why "acai" finds "Acai"), and ranks results by
    where the match was found.
 
-2. RATINGS (new). Every result shows its star average and how many residents
-   rated it. Open one: the average sits under the name, and the section
-   "Avaliacoes da vizinhanca" at the bottom shows the full breakdown - how many
-   5-star, how many 4-star, and so on - plus the most recent ratings.
+2. COMMUNITY RATINGS - NEW IN THIS BUILD
+   Open any business from the list. The star average and the number of ratings
+   appear under its name, and the same average appears next to every business
+   in the directory list. At the bottom of the detail screen, the section
+   "Avaliacoes da vizinhanca" (neighborhood ratings) shows the full breakdown -
+   how many 5-star, how many 4-star, and so on - plus the most recent ratings,
+   each with its stars and date. Ratings are stars only; there is no comment
+   field.
+
+   The directory is new, so most businesses still read "Ainda sem avaliacoes -
+   seja o primeiro a avaliar" (no ratings yet - be the first to rate). Step 3
+   shows the feature working end to end: a rating you submit appears in that
+   section immediately and changes the average shown next to the business in
+   the directory list.
 
 3. RATE IT (new). Tap "Avaliar esta loja", pick 1 to 5 stars, tap "Enviar".
    The breakdown and both averages update immediately. No account and no
@@ -105,11 +141,18 @@ The contact buttons are the last step of that flow, not the purpose of the app.
 
 2.3.10 - SCREENSHOTS
 
-You are correct: the old screenshots came from an Android device and showed the
-Android status bar. All of them were replaced with captures produced on an
-iPhone simulator running this build. We also removed a third-party platform
-name from the two contact buttons, which now read "Falar com a loja" (talk to
-the business) and "Pedidos e suporte" (orders and support).
+You are correct: the previous screenshots were captured on an Android device
+and showed the Android status bar. Every screenshot has been replaced with
+captures taken on an iPhone 16 Pro Max simulator running this build, showing
+the iOS status bar. They show the directory home screen with the search field
+and the categories, a search for "acai" and its results, the detail screen of
+one business with its ratings, the rating dialog, the subcategories inside one
+category, the saved-favorites screen, and the neighborhood-utility screens
+(emergency phone numbers and community notices).
+
+We also removed a third-party platform name from the two contact buttons,
+which now read "Falar com a loja" (talk to the business) and "Pedidos e
+suporte" (orders and support).
 
 
 2.3.1 - HIDDEN PANEL, DISCLOSED
@@ -150,10 +193,11 @@ What changed since build 1.0.0 (5):
 
 How to test in one minute:
 - Type "acai" in the search field on the first screen and tap the magnifier.
-- Open any result: the star average is under the name; scroll to the bottom for
-  the rating breakdown and the latest ratings.
-- Tap "Avaliar esta loja", pick stars, tap "Enviar" - the breakdown and the
-  average update immediately.
+- Open any result: the star average is under the name, the neighborhood
+  ratings are at the bottom. The directory is new, so most businesses read
+  "Ainda sem avaliacoes" (no ratings yet) until you add one.
+- Tap "Avaliar esta loja", pick stars, tap "Enviar" - the rating shows up
+  immediately and the average updates.
 - Tap the heart on a business, then "FAVORITOS" on the home screen.
 
 No login is required for any of the above.

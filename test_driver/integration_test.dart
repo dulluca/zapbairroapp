@@ -1,23 +1,16 @@
-// Driver do `flutter drive`: grava em screenshots/ uma imagem para cada
-// binding.takeScreenshot() pedido por integration_test/capturas_test.dart.
+// Driver do `flutter drive`: garante que exista um PNG em screenshots/ para
+// cada binding.takeScreenshot() pedido por integration_test/capturas_test.dart.
 //
-// POR QUE NAO USAMOS `xcrun simctl io booted screenshot` AQUI:
+// O ponto delicado aqui e o MOMENTO da foto. O integration_test nao entrega as
+// capturas uma a uma: ele guarda todas e so manda para o driver quando o teste
+// inteiro termina. Uma versao anterior chamava `xcrun simctl io screenshot`
+// aqui dentro, entao as fotos eram tiradas em sequencia depois do fim, com o
+// app parado na ultima tela -- e sairam todas identicas.
 //
-// O `integrationDriver` NAO chama onScreenshot no instante em que o teste pede
-// a captura. Ele acumula {nome, bytes} em reportData e, quando o teste inteiro
-// termina, percorre a lista chamando onScreenshot uma vez por imagem. Ou seja,
-// as chamadas acontecem todas no fim, com o simulador parado na ultima tela --
-// entao qualquer foto tirada aqui pelo simctl sai igual para todos os nomes.
-// Foi exatamente isso que embaralhou as capturas: 01-inicio saiu com a tela de
-// detalhes, 03-detalhes com o resultado da busca, e assim por diante.
-//
-// Os bytes que chegam neste callback, ao contrario, foram capturados DENTRO do
-// teste, no momento certo, e viajam junto com o nome. Sao esses que valem.
-//
-// Eles contem a superficie do Flutter em tela cheia, sem a barra de status do
-// iOS. Isso atende a rejeicao 2.3.10: o problema era a barra de status do
-// ANDROID aparecendo nas capturas -- captura sem barra de status nenhuma e
-// aceita pela App Store, e e o que a maioria das capturas promocionais usa.
+// Quem fotografa na hora certa agora e o workflow: o teste imprime uma linha
+// "###CAPTURA:<nome>" ao confirmar cada tela e o passo "Gerar as capturas"
+// dispara o simctl ali, com a tela ainda de pe e com a barra de status do iOS.
+// Este driver so cuida do que sobrar.
 import 'dart:io';
 
 import 'package:integration_test/integration_test_driver_extended.dart';
@@ -32,43 +25,29 @@ String _dimensoesPng(List<int> bytes) {
   return '${inteiro(16)}x${inteiro(20)}px';
 }
 
-// Impressao digital dos bytes (FNV-1a de 64 bits). Duas capturas com a mesma
-// digital sao a mesma imagem: sinal de que o teste fotografou a tela errada
-// -- foi o sintoma original deste workflow, entao aqui fica o alarme.
-String _digital(List<int> bytes) {
-  var h = 0xcbf29ce484222325;
-  for (final b in bytes) {
-    h = ((h ^ b) * 0x100000001b3).toUnsigned(64);
-  }
-  return h.toRadixString(16).padLeft(16, '0');
-}
-
 Future<void> main() async {
-  // digital -> nome da primeira captura que a produziu.
-  final vistas = <String, String>{};
-
   await integrationDriver(
     onScreenshot:
         (String nome, List<int> bytes, [Map<String, Object?>? args]) async {
       final pasta = Directory('screenshots');
       if (!pasta.existsSync()) pasta.createSync(recursive: true);
 
-      final destino = '${pasta.path}/$nome.png';
-      File(destino).writeAsBytesSync(bytes);
+      final destino = File('${pasta.path}/$nome.png');
 
-      final digital = _digital(bytes);
-      final repetida = vistas[digital];
-      if (repetida != null) {
-        // ::warning:: vira anotacao amarela no run do GitHub Actions.
-        stdout.writeln(
-          '::warning::Captura "$nome" e identica a "$repetida" -- '
-          'a tela nao mudou antes do print. Veja o log do teste.',
-        );
-      } else {
-        vistas[digital] = nome;
+      // Se o host ja fotografou, aquela imagem e melhor: e a tela inteira do
+      // iOS, com relogio, sinal e bateria. Nao sobrescrever.
+      if (destino.existsSync() && destino.lengthSync() > 0) {
+        stdout.writeln('captura ja feita pelo simulador: ${destino.path}');
+        return true;
       }
 
-      stdout.writeln('captura salva: $destino (${_dimensoesPng(bytes)})');
+      // Rede de seguranca: os bytes do Flutter tem so a superficie do app,
+      // sem a barra de status, mas garantem que a captura exista.
+      destino.writeAsBytesSync(bytes);
+      stdout.writeln(
+        'captura salva pela superficie Flutter: ${destino.path} '
+        '(${_dimensoesPng(bytes)})',
+      );
       return true;
     },
   );

@@ -534,6 +534,20 @@ Bug do pipeline, ja corrigido. A assinatura era passada na linha de comando do
 companhia, alem de embaralhar o nome do certificado. Agora ela e gravada so no
 target `Runner`. Puxe a correcao para a `main` e rode o build de novo.
 
+### "SDK version issue... must be built with the iOS 26 SDK or later"
+
+O build compila, o `.ipa` sai, e o upload morre no fim com erro 409 do altool.
+A Apple tem um piso de SDK para aceitar upload, e esse piso sobe de tempos em
+tempos. A mensagem diz com qual SDK o `.ipa` foi feito e qual e o minimo.
+
+Causa: alguem pinou o `xcode-version` do workflow de release numa versao
+antiga. Ele precisa ficar em `latest-stable`, que acompanha o piso sozinho.
+Confira em `.github/workflows/ios-release.yml`.
+
+O workflow de capturas e outra historia: ele pode ficar pinado, porque nao
+sobe nada para a Apple, e o tamanho da imagem de 6,9 polegadas (1320x2868) e o
+mesmo no iPhone 16 Pro Max e no 17 Pro Max.
+
 ### A Apple recusa o build por versao repetida
 
 Cada envio precisa de um build number maior que o anterior. O workflow usa o

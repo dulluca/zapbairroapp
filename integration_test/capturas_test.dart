@@ -17,15 +17,27 @@
 // 2. Nenhuma captura sai por tempo. Esperar segundos fixos foi o que gerou
 //    prints repetidos e fora de ordem: quando o Firestore do runner demorava
 //    mais que a espera, a foto saia com a tela anterior ou com o spinner.
-//    Agora cada captura exige uma PROVA -- um widget que so existe na tela
-//    pronta -- e e pulada (com log) se a prova nao aparecer no prazo.
-//    Captura pulada e melhor que captura errada: o artefato nunca traz uma
-//    imagem mentindo o nome que carrega.
+//    Cada captura exige uma PROVA -- um widget que so existe na tela pronta --
+//    e e pulada (com log) se a prova nao aparecer no prazo. Captura pulada e
+//    melhor que captura errada: o artefato nunca traz uma imagem mentindo o
+//    nome que carrega.
 //
-// 3. As provas apontam para dentro da tela nova (find.descendant). As rotas
+// 3. A foto de verdade nao e tirada aqui. Confirmada a prova, o teste imprime
+//    "###CAPTURA:<nome>" e o workflow dispara `xcrun simctl io screenshot`
+//    naquele instante, com a tela de pe e com a barra de status do iOS. O
+//    takeScreenshot no fim da janela e so rede de seguranca (o driver ignora
+//    esses bytes quando o simctl ja fotografou). O integration_test entrega
+//    os bytes ao driver apenas quando o teste inteiro acaba -- confiar neles
+//    como fonte principal foi o que ja rendeu seis capturas identicas.
+//
+// 4. As provas apontam para dentro da tela nova (find.descendant). As rotas
 //    anteriores do Navigator continuam montadas na arvore, entao um finder
 //    solto acharia, por exemplo, o botao AVISOS da tela inicial embaixo da
 //    tela de avisos, e a captura sairia cedo demais.
+//
+// NAO existe captura do rodape dos detalhes: numa tela de 6,9 polegadas os
+// detalhes cabem inteiros (avaliacoes e botao incluidos) e a foto saia
+// identica a dos detalhes.
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,8 +91,9 @@ void main() {
       }
     }
 
-    // So captura quando todas as provas estao na tela e nenhum spinner
-    // continua girando. Se algo nao chegar no prazo, pula com log.
+    // So anuncia a captura quando todas as provas estao na tela e nenhum
+    // spinner continua girando. Se algo nao chegar no prazo, pula com log e
+    // o workflow avisa que a captura nao saiu.
     Future<void> capturar(String nome, {required List<Finder> provas}) async {
       for (final prova in provas) {
         final apareceu = await esperarAte(
@@ -103,11 +116,17 @@ void main() {
         debugPrint('### captura "$nome" PULADA: um carregando nunca terminou');
         return;
       }
-      // Um ultimo suspiro para a moldura terminar de desenhar (imagens,
-      // estrelas de avaliacao) antes do print.
+      // Um suspiro para a moldura terminar de desenhar (imagens, estrelas)
+      // antes do sinal.
       await respirar(tester);
+
+      // O workflow fotografa ao ver esta linha; a espera e a janela dele.
+      debugPrint('###CAPTURA:$nome');
+      await respirar(tester, decimos: 30);
+
+      // Rede de seguranca, caso o simctl falhe no host.
       await binding.takeScreenshot(nome);
-      debugPrint('>>> captura ok: $nome');
+      debugPrint('>>> captura concluida: $nome');
     }
 
     // Recomeca o app na tela inicial, sem rota nenhuma empilhada.
@@ -144,10 +163,10 @@ void main() {
     });
 
     // ---------------------------------------------------------------- 2
-    // Busca por texto e, na mesma corrida, os detalhes de um resultado.
-    // O termo vai sem acento de proposito: a captura mostra que "acai"
-    // encontra "Acai".
-    await grupo('busca e detalhes', () async {
+    // Busca por texto e, na mesma corrida, os detalhes de um resultado e a
+    // caixa de avaliacao. O termo vai sem acento de proposito: a captura
+    // mostra que "acai" encontra "Acai".
+    await grupo('busca, detalhes e avaliacao', () async {
       await abrirDoZero();
       await buscar('acai');
       await capturar('02-busca', provas: [resultadoDaBusca]);
@@ -157,25 +176,62 @@ void main() {
         return;
       }
       await tester.tap(resultadoDaBusca.first);
-      await capturar(
-        '03-detalhes',
-        provas: [find.byType(TelaDetalhes)],
-      );
+      await capturar('03-detalhes', provas: [find.byType(TelaDetalhes)]);
 
-      // Rodape dos detalhes: distribuicao das notas e ultimas avaliacoes.
       final avaliar = find.text('Avaliar esta loja');
       if (avaliar.evaluate().isEmpty) {
         debugPrint('### botao "Avaliar esta loja" nao encontrado');
         return;
       }
       await tester.ensureVisible(avaliar);
-      await capturar('04-avaliacoes', provas: [avaliar]);
-
+      await respirar(tester);
       await tester.tap(avaliar);
-      await capturar('05-avaliar', provas: [find.byType(AlertDialog)]);
+      await capturar('04-avaliar', provas: [find.byType(AlertDialog)]);
     });
 
     // ---------------------------------------------------------------- 3
+    // Favoritos: guarda uma loja e mostra a lista guardada.
+    await grupo('favoritos', () async {
+      await abrirDoZero();
+      await buscar('acai');
+      final achou = await esperarAte(
+        tester,
+        () => resultadoDaBusca.evaluate().isNotEmpty,
+      );
+      if (!achou) {
+        debugPrint('### busca sem resultado, pulando favoritos');
+        return;
+      }
+
+      final coracao = find.byIcon(Icons.favorite_border);
+      if (coracao.evaluate().isEmpty) {
+        debugPrint('### nenhum coracao vazio na lista, pulando favoritos');
+        return;
+      }
+      await tester.tap(coracao.first);
+      // A confirmacao some sozinha em ~900ms: esperamos ela sair para nao
+      // aparecer atravessada na captura.
+      await respirar(tester, decimos: 15);
+
+      await abrirDoZero();
+      final botaoFavoritos = find.text('FAVORITOS');
+      if (botaoFavoritos.evaluate().isEmpty) {
+        debugPrint('### botao FAVORITOS nao encontrado');
+        return;
+      }
+      await tester.tap(botaoFavoritos);
+      await capturar(
+        '05-favoritos',
+        provas: [
+          find.descendant(
+            of: find.byType(TelaFavoritos),
+            matching: find.byType(ListTile),
+          ),
+        ],
+      );
+    });
+
+    // ---------------------------------------------------------------- 4
     // Navegacao por categoria: as especialidades de Alimentacao.
     await grupo('especialidades', () async {
       await abrirDoZero();
@@ -197,46 +253,6 @@ void main() {
       );
     });
 
-    // ---------------------------------------------------------------- 4
-    // Favoritos: guarda uma loja e mostra a lista guardada.
-    await grupo('favoritos', () async {
-      await abrirDoZero();
-      await buscar('acai');
-      final achou = await esperarAte(
-        tester,
-        () => resultadoDaBusca.evaluate().isNotEmpty,
-      );
-      if (!achou) {
-        debugPrint('### busca sem resultado, pulando favoritos');
-        return;
-      }
-
-      final coracao = find.byIcon(Icons.favorite_border);
-      if (coracao.evaluate().isEmpty) {
-        debugPrint('### nenhum coracao vazio na lista, pulando favoritos');
-        return;
-      }
-      await tester.tap(coracao.first);
-      await respirar(tester, decimos: 10);
-
-      await abrirDoZero();
-      final botaoFavoritos = find.text('FAVORITOS');
-      if (botaoFavoritos.evaluate().isEmpty) {
-        debugPrint('### botao FAVORITOS nao encontrado');
-        return;
-      }
-      await tester.tap(botaoFavoritos);
-      await capturar(
-        '07-favoritos',
-        provas: [
-          find.descendant(
-            of: find.byType(TelaFavoritos),
-            matching: find.byType(ListTile),
-          ),
-        ],
-      );
-    });
-
     // ---------------------------------------------------------------- 5
     // Utilidades/Emergencias: telefones uteis agrupados por secao.
     await grupo('utilidades/emergencias', () async {
@@ -248,7 +264,7 @@ void main() {
       }
       await tester.tap(botao);
       await capturar(
-        '08-utilidades-emergencias',
+        '07-utilidades-emergencias',
         provas: [
           find.descendant(
             of: find.byType(TelaEmergencia),
@@ -269,7 +285,7 @@ void main() {
       }
       await tester.tap(botao);
       await capturar(
-        '09-avisos-comunitarios',
+        '08-avisos-comunitarios',
         provas: [
           // Os cartoes de aviso usam o icone de megafone; procurar dentro da
           // TelaAvisos garante que nao e o botao da tela inicial por baixo.
