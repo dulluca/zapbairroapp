@@ -25,10 +25,17 @@
 // 3. A foto de verdade nao e tirada aqui. Confirmada a prova, o teste imprime
 //    "###CAPTURA:<nome>" e o workflow dispara `xcrun simctl io screenshot`
 //    naquele instante, com a tela de pe e com a barra de status do iOS. O
-//    takeScreenshot no fim da janela e so rede de seguranca (o driver ignora
-//    esses bytes quando o simctl ja fotografou). O integration_test entrega
-//    os bytes ao driver apenas quando o teste inteiro acaba -- confiar neles
+//    takeScreenshot no fim e so rede de seguranca (o driver ignora esses
+//    bytes quando o simctl ja fotografou). O integration_test entrega os
+//    bytes ao driver apenas quando o teste inteiro acaba -- confiar neles
 //    como fonte principal foi o que ja rendeu seis capturas identicas.
+//
+//    Depois do sinal, o teste SEGURA A TELA ate o host confirmar a foto,
+//    escrevendo um arquivo em Documents (simctl get_app_container permite ao
+//    host escrever no container do app). Uma janela de tempo fixo nao basta:
+//    o streaming de log do simulador ja atrasou segundos a entrega do sinal,
+//    e no run #13 as capturas 03 e 04 sairam identicas a 05 porque a foto
+//    so foi tirada quando o app ja estava na tela de favoritos.
 //
 // 4. As provas apontam para dentro da tela nova (find.descendant). As rotas
 //    anteriores do Navigator continuam montadas na arvore, entao um finder
@@ -38,6 +45,8 @@
 // NAO existe captura do rodape dos detalhes: numa tela de 6,9 polegadas os
 // detalhes cabem inteiros (avaliacoes e botao incluidos) e a foto saia
 // identica a dos detalhes.
+import 'dart:io';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -120,9 +129,23 @@ void main() {
       // antes do sinal.
       await respirar(tester);
 
-      // O workflow fotografa ao ver esta linha; a espera e a janela dele.
+      // O workflow fotografa ao ver esta linha e confirma criando o arquivo
+      // abaixo dentro do container do app. Seguramos a tela ate a confirmacao
+      // chegar: o sinal viaja pelo log do simulador, que ja atrasou segundos,
+      // e fotografar depois que a tela mudou e o que gera captura repetida.
+      final confirmacao = File(
+        '${Platform.environment['HOME']}/Documents/captura_confirmada_$nome',
+      );
       debugPrint('###CAPTURA:$nome');
-      await respirar(tester, decimos: 30);
+      final confirmou = await esperarAte(
+        tester,
+        confirmacao.existsSync,
+      );
+      if (!confirmou) {
+        // Rodando local (sem o workflow) ninguem confirma; segue o fluxo e
+        // vale a captura da superficie Flutter logo abaixo.
+        debugPrint('### captura "$nome" sem confirmacao do host em 30s');
+      }
 
       // Rede de seguranca, caso o simctl falhe no host.
       await binding.takeScreenshot(nome);

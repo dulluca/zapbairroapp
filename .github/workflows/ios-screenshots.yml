@@ -227,6 +227,19 @@ jobs:
                       else
                         printf '>>> FALHOU a captura pelo simulador: %s\n' "$nome"
                       fi
+                      # Confirma a foto criando um arquivo no container do
+                      # app: o teste SEGURA a tela ate ve-lo. Sem isso, um
+                      # atraso no log que carrega o sinal rende foto da tela
+                      # errada -- run #13: 03 e 04 sairam identicas a 05.
+                      if [ -z "${CONTAINER_APP:-}" ]; then
+                        CONTAINER_APP=$(xcrun simctl get_app_container "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" data 2>/dev/null || true)
+                      fi
+                      if [ -n "${CONTAINER_APP:-}" ]; then
+                        mkdir -p "$CONTAINER_APP/Documents"
+                        : > "$CONTAINER_APP/Documents/captura_confirmada_$nome"
+                      else
+                        printf '>>> sem acesso ao container do app; captura "%s" sem confirmacao\n' "$nome"
+                      fi
                       ;;
                   esac
                 done | tee -a logs/flutter-drive.log
@@ -244,6 +257,13 @@ jobs:
           tentar() {
             echo "=== tentativa $1 ===" | tee -a logs/flutter-drive.log
             xcrun simctl terminate "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" 2>/dev/null || true
+
+            # Confirmacoes de captura de uma tentativa anterior enganariam o
+            # teste (ele seguiria em frente antes da foto). Fora com elas.
+            container_velho=$(xcrun simctl get_app_container "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" data 2>/dev/null || true)
+            if [ -n "$container_velho" ]; then
+              rm -f "$container_velho"/Documents/captura_confirmada_* 2>/dev/null || true
+            fi
 
             rodar_drive &
             drive_pid=$!
