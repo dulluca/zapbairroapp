@@ -130,13 +130,23 @@ void main() {
     }
 
     // Recomeca o app na tela inicial, sem rota nenhuma empilhada.
+    //
+    // A UniqueKey e obrigatoria. `const ZapBairroApp()` e sempre a MESMA
+    // instancia (canonicalizacao de const), e o pumpWidget com um widget
+    // identico ao anterior nao reconstroi nada: a arvore velha fica de pe com
+    // a pilha de rotas inteira. Foi assim que o run #9 perdeu as capturas 05
+    // a 08 -- o "app novo" continuava nos detalhes com o dialogo aberto.
+    // Com uma chave nova a cada chamada, o Flutter descarta a arvore velha e
+    // o app realmente recomeca na tela inicial.
     Future<void> abrirDoZero() async {
-      await tester.pumpWidget(const ZapBairroApp());
+      await tester.pumpWidget(ZapBairroApp(key: UniqueKey()));
       final pronto = await esperarAte(
         tester,
         () => find.text('Explore por Categorias').evaluate().isNotEmpty,
       );
-      if (!pronto) debugPrint('### tela inicial nao terminou de abrir');
+      if (!pronto) {
+        throw StateError('a tela inicial nao apareceu depois do pumpWidget');
+      }
     }
 
     // Digita o termo na busca da tela inicial e abre a lista de resultados.
