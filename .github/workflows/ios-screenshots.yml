@@ -170,9 +170,10 @@ jobs:
             --batteryLevel 100 || true
 
       - name: Gerar as capturas
-        # 25min: o build leva uns 6, o resto e o drive. O que passar disso e
-        # travamento, e os logs sobem no passo seguinte de qualquer jeito.
-        timeout-minutes: 25
+        # 35min: cabe o pior caso das duas tentativas do drive (cao de guarda
+        # de 15min cada) mais o teste em si. O que passar disso e travamento,
+        # e os logs sobem no passo seguinte de qualquer jeito.
+        timeout-minutes: 35
         run: |
           set -euo pipefail
 
@@ -204,26 +205,87 @@ jobs:
           # para o driver nao funciona: o integration_test so entrega as
           # imagens no fim do teste, e ai o app ja esta na ultima tela -- foi
           # assim que o run #6 gerou seis capturas identicas.
+          #
+          # A funcao roda em subshell com pipefail para o status final ser o
+          # do flutter drive, e em segundo plano para o cao de guarda logo
+          # abaixo poder mata-la se a conexao nao acontecer.
+          rodar_drive() {
+            (
+              set -o pipefail
+              flutter drive \
+                --driver=test_driver/integration_test.dart \
+                --target=integration_test/capturas_test.dart \
+                -d "$SIMULADOR_UDID" 2>&1 | while IFS= read -r linha; do
+                  printf '%s\n' "$linha"
+                  case "$linha" in
+                    *'###CAPTURA:'*)
+                      nome=${linha##*###CAPTURA:}
+                      nome=$(printf '%s' "$nome" | tr -d '\r' | awk '{print $1}')
+                      [ -n "$nome" ] || continue
+                      if xcrun simctl io "$SIMULADOR_UDID" screenshot "screenshots/$nome.png" >/dev/null 2>&1; then
+                        printf '>>> capturado do simulador: %s\n' "$nome"
+                      else
+                        printf '>>> FALHOU a captura pelo simulador: %s\n' "$nome"
+                      fi
+                      ;;
+                  esac
+                done | tee -a logs/flutter-drive.log
+            )
+          }
+
+          # Uma tentativa do drive, com cao de guarda na CONEXAO: o run #10
+          # ficou 23 minutos calado depois do "Xcode build done" porque o
+          # drive nunca enxergou o VM service do app (o app estava aberto e
+          # saudavel no simulador; e o streaming de log do simulador que as
+          # vezes engole a linha com a URL). O drive espera essa conexao para
+          # sempre, entao o prazo tem que vir de fora: se em 15 minutos nao
+          # aparecer "Connected to Flutter application" no log (prazo que
+          # cobre o build com folga), matamos a tentativa e devolvemos 99.
+          tentar() {
+            echo "=== tentativa $1 ===" | tee -a logs/flutter-drive.log
+            xcrun simctl terminate "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" 2>/dev/null || true
+
+            rodar_drive &
+            drive_pid=$!
+
+            conectou=0
+            for _ in $(seq 1 180); do
+              kill -0 "$drive_pid" 2>/dev/null || break
+              if grep -q "tentativa $1" logs/flutter-drive.log \
+                 && grep -q "Connected to Flutter application" logs/flutter-drive.log; then
+                conectou=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$conectou" != 1 ] && kill -0 "$drive_pid" 2>/dev/null; then
+              echo "::warning::flutter drive nao conectou no app em 15 minutos; matando a tentativa $1."
+              pkill -TERM -P "$drive_pid" 2>/dev/null || true
+              kill -TERM "$drive_pid" 2>/dev/null || true
+              pkill -TERM -f "flutter drive" 2>/dev/null || true
+              sleep 5
+              pkill -KILL -f "flutter drive" 2>/dev/null || true
+              kill -KILL "$drive_pid" 2>/dev/null || true
+              wait "$drive_pid" 2>/dev/null || true
+              return 99
+            fi
+
+            wait "$drive_pid"
+          }
+
           set +e
-          flutter drive \
-            --driver=test_driver/integration_test.dart \
-            --target=integration_test/capturas_test.dart \
-            -d "$SIMULADOR_UDID" 2>&1 | while IFS= read -r linha; do
-              printf '%s\n' "$linha"
-              case "$linha" in
-                *'###CAPTURA:'*)
-                  nome=${linha##*###CAPTURA:}
-                  nome=$(printf '%s' "$nome" | tr -d '\r' | awk '{print $1}')
-                  [ -n "$nome" ] || continue
-                  if xcrun simctl io "$SIMULADOR_UDID" screenshot "screenshots/$nome.png" >/dev/null 2>&1; then
-                    printf '>>> capturado do simulador: %s\n' "$nome"
-                  else
-                    printf '>>> FALHOU a captura pelo simulador: %s\n' "$nome"
-                  fi
-                  ;;
-              esac
-            done | tee -a logs/flutter-drive.log
-          status=${PIPESTATUS[0]}
+          tentar 1
+          status=$?
+          if [ "$status" = 99 ]; then
+            echo "Primeira tentativa nao conectou; tentando de novo (o build ja esta em cache)."
+            tentar 2
+            status=$?
+            if [ "$status" = 99 ]; then
+              echo "::error::flutter drive nao conectou no app em nenhuma das duas tentativas."
+              status=1
+            fi
+          fi
           set -e
 
           kill "$log_pid" 2>/dev/null || true
