@@ -1,0 +1,401 @@
+name: iOS - Capturas de tela (App Store)
+
+# Gera as capturas de tela da App Store rodando o app no Simulador do iOS.
+#
+# Existe por causa da rejeicao 2.3.10: as capturas anteriores eram prints do
+# Android, com a barra de status do Android. As daqui saem do proprio iOS.
+# Nenhum iPhone e necessario -- o runner macOS ja traz Xcode e os Simuladores.
+#
+# Ao final, baixe o artefato "capturas-ios" do run e suba as imagens em
+# App Store Connect > Previas e Capturas de Tela.
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulador:
+        description: "Nome do simulador (vazio = escolhe um iPhone Pro Max)"
+        required: false
+        default: ""
+
+env:
+  IOS_BUNDLE_ID: com.zapbairro.zapbairro
+  FLUTTER_VERSION: 3.44.4
+
+jobs:
+  capturas:
+    name: Gerar capturas no Simulador
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Selecionar Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # Nao usar "latest-stable": no runner macos-15 isso hoje traz o
+          # Xcode 26, cujo unico runtime e o iOS 26 -- e foi um simulador
+          # desse runtime (iPhone 17 Pro Max) que travou no boot por 59min.
+          # O Xcode 16 traz o iOS 18, com o iPhone 16 Pro Max, que tem
+          # exatamente as 6,9 polegadas que a App Store pede.
+          xcode-version: "^16.0"
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Instalar GoogleService-Info.plist
+        env:
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: |
+          set -euo pipefail
+          destino=ios/Runner/GoogleService-Info.plist
+          if [ -n "${GOOGLE_SERVICE_INFO_PLIST:-}" ]; then
+            printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" | tr -d '\n\r' | openssl base64 -d -A > "$destino"
+            echo "GoogleService-Info.plist escrito a partir do secret."
+          elif [ -f "$destino" ]; then
+            echo "Usando o GoogleService-Info.plist versionado no repositorio."
+          else
+            echo "::error::Sem GoogleService-Info.plist. O app abre e crasha sem ele."
+            exit 1
+          fi
+
+          # O app chama Firebase.initializeApp() sem opcoes: se o bundle nao
+          # bater, ele crasha na abertura e nao sai captura nenhuma.
+          gsi_bundle=$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$destino")
+          if [ "$gsi_bundle" != "$IOS_BUNDLE_ID" ]; then
+            echo "::error::GoogleService-Info.plist e do bundle '$gsi_bundle', mas o app e '$IOS_BUNDLE_ID'."
+            exit 1
+          fi
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Escolher e ligar o simulador
+        # Prazo curto de proposito: se o simulador empacar, o run morre em
+        # 15 minutos com log, em vez de queimar a hora inteira do job.
+        timeout-minutes: 15
+        env:
+          SIMULADOR_PEDIDO: ${{ github.event.inputs.simulador }}
+        run: |
+          set -euo pipefail
+
+          echo "--- Xcode e runtimes deste runner ---"
+          xcodebuild -version
+          xcrun simctl list runtimes
+          echo "--- Simuladores disponiveis ---"
+          xcrun simctl list devices available | grep -i iphone || true
+          echo "-------------------------------------"
+
+          escolher() {
+            # Devolve o UDID do primeiro simulador disponivel cujo nome casa
+            # com o padrao recebido.
+            #
+            # O "awk NR==1" no fim faz o papel do "head -1": o head fecha o
+            # pipe cedo, o grep morre de SIGPIPE e, com pipefail, isso
+            # derrubaria o passo inteiro sem explicacao.
+            xcrun simctl list devices available \
+              | grep -E "$1" \
+              | sed -E -n 's/.*\(([0-9A-F-]{36})\).*/\1/p' \
+              | awk 'NR==1' || true
+          }
+
+          if [ -n "${SIMULADOR_PEDIDO:-}" ]; then
+            udid=$(escolher "$SIMULADOR_PEDIDO")
+            nome="$SIMULADOR_PEDIDO"
+          else
+            # A App Store pede a captura de 6.9 polegadas, que e o tamanho dos
+            # modelos Pro Max recentes.
+            for padrao in "iPhone 16 Pro Max" "iPhone 1[789] Pro Max" "iPhone .* Pro Max" "iPhone"; do
+              udid=$(escolher "$padrao")
+              if [ -n "$udid" ]; then nome="$padrao"; break; fi
+            done
+          fi
+
+          if [ -z "${udid:-}" ]; then
+            echo "::error::Nenhum simulador de iPhone disponivel neste runner."
+            exit 1
+          fi
+
+          echo "Simulador escolhido ($nome): $udid"
+          echo "SIMULADOR_UDID=$udid" >> "$GITHUB_ENV"
+
+          # Um simulador ligado e so um: o driver fotografa com
+          # `simctl io booted`, que fica ambiguo se houver outro de pe.
+          xcrun simctl shutdown all 2>/dev/null || true
+
+          # A Simulator.app precisa estar aberta. Sem ela, o boot puro do
+          # simctl no runner headless para antes de subir o SpringBoard --
+          # foi ai que o `simctl bootstatus -b` ficou 59 minutos esperando um
+          # fim que nunca chega, porque esse comando nao tem prazo.
+          open -a Simulator --args -CurrentDeviceUDID "$udid" || true
+          xcrun simctl boot "$udid" 2>&1 || true
+
+          # Espera com prazo e com log, no lugar do bootstatus. O teste de
+          # pronto e tirar uma captura de verdade: e exatamente o que o
+          # driver vai fazer depois, entao se passar aqui, passa la.
+          pronto=0
+          for i in $(seq 1 60); do
+            estado=$(xcrun simctl list devices | grep "$udid" | sed -E 's/.*\(([^()]+)\)[[:space:]]*$/\1/' || true)
+            echo "[$((i * 5))s] estado: ${estado:-desconhecido}"
+            if [ "$estado" = "Booted" ] \
+               && xcrun simctl io "$udid" screenshot /tmp/probe.png >/dev/null 2>&1; then
+              pronto=1
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$pronto" != "1" ]; then
+            echo "::error::O simulador nao terminou de ligar em 5 minutos."
+            xcrun simctl list devices | grep "$udid" || true
+            exit 1
+          fi
+          echo "Simulador pronto."
+
+          # Relogio 9:41 e sinal/bateria cheios, como nas capturas da Apple.
+          # Aparece nas capturas: o passo "Gerar as capturas" fotografa com
+          # `simctl io screenshot`, que inclui a barra de status do iOS.
+          xcrun simctl status_bar "$udid" override \
+            --time "9:41" \
+            --cellularMode active \
+            --cellularBars 4 \
+            --wifiMode active \
+            --wifiBars 3 \
+            --batteryState charged \
+            --batteryLevel 100 || true
+
+      - name: Gerar as capturas
+        # 35min: cabe o pior caso das duas tentativas do drive (cao de guarda
+        # de 15min cada) mais o teste em si. O que passar disso e travamento,
+        # e os logs sobem no passo seguinte de qualquer jeito.
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+
+          # Mesmo motivo do workflow de release: este projeto usa Swift Package
+          # Manager, nao CocoaPods.
+          if [ -f ios/Podfile ]; then
+            echo "::error::ios/Podfile voltou a existir; este projeto usa Swift Package Manager."
+            exit 1
+          fi
+          flutter config --enable-swift-package-manager
+
+          mkdir -p logs
+
+          # O log do proprio simulador, em segundo plano. Se o app crashar ao
+          # abrir, o `flutter drive` nao reclama: ele fica esperando para
+          # sempre uma conexao que nao vem. Foi o run #5, 22 minutos calado
+          # depois do "Xcode build done". O motivo so aparece aqui.
+          xcrun simctl spawn "$SIMULADOR_UDID" log stream \
+            --style compact \
+            --predicate 'processImagePath CONTAINS "Runner" OR senderImagePath CONTAINS "Runner"' \
+            > logs/simulador.log 2>&1 &
+          log_pid=$!
+
+          mkdir -p screenshots
+
+          # A saida do drive passa por este laco em vez de um tee simples.
+          # Quando o teste anuncia que chegou numa tela, a foto sai daqui, na
+          # hora, com a tela de pe e com a barra de status do iOS. Deixar isso
+          # para o driver nao funciona: o integration_test so entrega as
+          # imagens no fim do teste, e ai o app ja esta na ultima tela -- foi
+          # assim que o run #6 gerou seis capturas identicas.
+          #
+          # A funcao roda em subshell com pipefail para o status final ser o
+          # do flutter drive, e em segundo plano para o cao de guarda logo
+          # abaixo poder mata-la se a conexao nao acontecer.
+          rodar_drive() {
+            (
+              set -o pipefail
+              flutter drive \
+                --driver=test_driver/integration_test.dart \
+                --target=integration_test/capturas_test.dart \
+                -d "$SIMULADOR_UDID" 2>&1 | while IFS= read -r linha; do
+                  printf '%s\n' "$linha"
+                  case "$linha" in
+                    *'###CAPTURA:'*)
+                      nome=${linha##*###CAPTURA:}
+                      nome=$(printf '%s' "$nome" | tr -d '\r' | awk '{print $1}')
+                      [ -n "$nome" ] || continue
+                      if xcrun simctl io "$SIMULADOR_UDID" screenshot "screenshots/$nome.png" >/dev/null 2>&1; then
+                        printf '>>> capturado do simulador: %s\n' "$nome"
+                      else
+                        printf '>>> FALHOU a captura pelo simulador: %s\n' "$nome"
+                      fi
+                      # Confirma a foto criando um arquivo no container do
+                      # app: o teste SEGURA a tela ate ve-lo. Sem isso, um
+                      # atraso no log que carrega o sinal rende foto da tela
+                      # errada -- run #13: 03 e 04 sairam identicas a 05.
+                      if [ -z "${CONTAINER_APP:-}" ]; then
+                        CONTAINER_APP=$(xcrun simctl get_app_container "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" data 2>/dev/null || true)
+                      fi
+                      if [ -n "${CONTAINER_APP:-}" ]; then
+                        mkdir -p "$CONTAINER_APP/Documents"
+                        : > "$CONTAINER_APP/Documents/captura_confirmada_$nome"
+                      else
+                        printf '>>> sem acesso ao container do app; captura "%s" sem confirmacao\n' "$nome"
+                      fi
+                      ;;
+                  esac
+                done | tee -a logs/flutter-drive.log
+            )
+          }
+
+          # Uma tentativa do drive, com cao de guarda na CONEXAO: o run #10
+          # ficou 23 minutos calado depois do "Xcode build done" porque o
+          # drive nunca enxergou o VM service do app (o app estava aberto e
+          # saudavel no simulador; e o streaming de log do simulador que as
+          # vezes engole a linha com a URL). O drive espera essa conexao para
+          # sempre, entao o prazo tem que vir de fora: se em 15 minutos nao
+          # aparecer "Connected to Flutter application" no log (prazo que
+          # cobre o build com folga), matamos a tentativa e devolvemos 99.
+          tentar() {
+            echo "=== tentativa $1 ===" | tee -a logs/flutter-drive.log
+            xcrun simctl terminate "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" 2>/dev/null || true
+
+            # Confirmacoes de captura de uma tentativa anterior enganariam o
+            # teste (ele seguiria em frente antes da foto). Fora com elas.
+            container_velho=$(xcrun simctl get_app_container "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" data 2>/dev/null || true)
+            if [ -n "$container_velho" ]; then
+              rm -f "$container_velho"/Documents/captura_confirmada_* 2>/dev/null || true
+            fi
+
+            rodar_drive &
+            drive_pid=$!
+
+            conectou=0
+            for _ in $(seq 1 180); do
+              kill -0 "$drive_pid" 2>/dev/null || break
+              if grep -q "tentativa $1" logs/flutter-drive.log \
+                 && grep -q "Connected to Flutter application" logs/flutter-drive.log; then
+                conectou=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$conectou" != 1 ] && kill -0 "$drive_pid" 2>/dev/null; then
+              echo "::warning::flutter drive nao conectou no app em 15 minutos; matando a tentativa $1."
+              pkill -TERM -P "$drive_pid" 2>/dev/null || true
+              kill -TERM "$drive_pid" 2>/dev/null || true
+              pkill -TERM -f "flutter drive" 2>/dev/null || true
+              sleep 5
+              pkill -KILL -f "flutter drive" 2>/dev/null || true
+              kill -KILL "$drive_pid" 2>/dev/null || true
+              wait "$drive_pid" 2>/dev/null || true
+              return 99
+            fi
+
+            wait "$drive_pid"
+          }
+
+          set +e
+          tentar 1
+          status=$?
+          if [ "$status" = 99 ]; then
+            echo "Primeira tentativa nao conectou; tentando de novo (o build ja esta em cache)."
+            tentar 2
+            status=$?
+            if [ "$status" = 99 ]; then
+              echo "::error::flutter drive nao conectou no app em nenhuma das duas tentativas."
+              status=1
+            fi
+          fi
+          set -e
+
+          kill "$log_pid" 2>/dev/null || true
+          exit "$status"
+
+      - name: Juntar os logs de diagnostico
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p logs
+
+          # Relatorios de crash do app dentro do simulador: e o que diz se ele
+          # morreu na abertura em vez de simplesmente nao conectar.
+          crashes="$HOME/Library/Logs/DiagnosticReports"
+          if [ -d "$crashes" ]; then
+            for c in "$crashes"/*Runner*; do
+              [ -e "$c" ] && cp "$c" logs/ || true
+            done
+          fi
+
+          if [ -n "${SIMULADOR_UDID:-}" ]; then
+            xcrun simctl list devices | grep "$SIMULADOR_UDID" > logs/estado-simulador.txt 2>&1 || true
+          fi
+
+          echo "Logs juntados:"
+          ls -la logs/ || true
+
+      - name: Publicar os logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-diagnostico
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Conferir o que saiu
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -d screenshots ] || [ -z "$(ls -A screenshots 2>/dev/null)" ]; then
+            echo "::error::Nenhuma captura foi gerada. Veja o log do passo anterior."
+            exit 1
+          fi
+          # Medidas que o App Store Connect aceita no slot de iPhone. Se a
+          # captura sair fora delas, o upload e recusado no site -- melhor
+          # descobrir aqui do que depois de baixar o artefato.
+          aceitas="1320x2868 1290x2796 1284x2778 1242x2688"
+
+          echo "Capturas geradas:"
+          fora=""
+          for img in screenshots/*.png; do
+            largura=$(sips -g pixelWidth "$img" | awk '/pixelWidth/ {print $2}')
+            altura=$(sips -g pixelHeight "$img" | awk '/pixelHeight/ {print $2}')
+            medida="${largura}x${altura}"
+            echo "  $(basename "$img") -> ${medida}px"
+            case " $aceitas " in
+              *" $medida "*) ;;
+              *) fora="$fora $(basename "$img")($medida)" ;;
+            esac
+          done
+
+          if [ -n "$fora" ]; then
+            echo "::warning::Fora das medidas de iPhone da App Store ($aceitas):$fora. Rode de novo escolhendo um simulador Pro Max."
+          fi
+
+          # As capturas que o teste tenta gerar, na ordem. Uma faltando
+          # significa que aquele grupo falhou ou foi pulado no simulador --
+          # o log do passo "Gerar as capturas" diz o motivo exato.
+          esperadas="01-inicio 02-busca 03-detalhes 04-avaliar 05-favoritos 06-especialidades 07-utilidades-emergencias 08-avisos-comunitarios"
+          for nome in $esperadas; do
+            if [ ! -f "screenshots/$nome.png" ]; then
+              echo "::warning::Captura esperada nao saiu: $nome.png (o grupo dela falhou ou foi pulado; veja o log do drive)."
+            fi
+          done
+
+          # Duas capturas identicas byte a byte = print repetido (a tela nao
+          # mudou antes da foto). O driver ja avisa na hora; aqui e a rede de
+          # seguranca caso o log do drive tenha passado despercebido.
+          duplicadas=$(shasum screenshots/*.png | sort | awk '{print $1}' | uniq -d)
+          for hash in $duplicadas; do
+            iguais=$(shasum screenshots/*.png | awk -v h="$hash" '$1==h {print $2}' | tr '\n' ' ')
+            echo "::warning::Capturas identicas (tela repetida): $iguais"
+          done
+
+      - name: Publicar as capturas como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-ios
+          path: screenshots/
+          if-no-files-found: error
+          retention-days: 30
