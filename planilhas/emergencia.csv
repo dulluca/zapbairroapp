@@ -1,0 +1,27 @@
+secao,nome,descricao,telefone,ordem
+Emergências principais (24h),Polícia Militar,Emergência policial,190,1
+Emergências principais (24h),SAMU,Atendimento médico de urgência,192,2
+Emergências principais (24h),Corpo de Bombeiros,"Incêndio, resgate e acidentes",193,3
+Emergências principais (24h),Defesa Civil,"Alagamentos, desabamentos e árvores",199,4
+Emergências principais (24h),GCM,Guarda Civil Metropolitana,5591984658515,5
+Emergências principais (24h),Hospital Regional,Atendimento 24 horas,5591984658515,6
+Emergências principais (24h),UPA 24h,UPA Bairro Novo - atendimento 24 horas,5591984658515,7
+Serviços públicos,Secretaria de Educação,,5591991448715,8
+Serviços públicos,"Secretaria de Cultura, Turismo e Desportos",,5591991267405,9
+Serviços públicos,Secretaria de Assistência Social,,5591991001214,10
+Serviços públicos,"Secretaria de Agricultura, Desenvolvimento Rural e Econômico",,5591991549205,11
+Serviços públicos,Secretaria de Administração,,5591984273060,12
+Serviços públicos,Secretaria do Meio Ambiente,,5591984297668,13
+Serviços públicos,Secretaria de Planejamento e Gestão,,5591985288007,14
+Serviços públicos,Secretaria de Finanças,,+55 91 3781-3886,15
+Serviços públicos,DEMUT,Departamento Municipal de Trânsito,5591985315782,16
+Serviços públicos,SEMAD,Secretaria Municipal de Administração,5591984273060,17
+Apoio comunitário e social,Ouvidoria,,5591984658515,18
+Apoio comunitário e social,Conselho Tutelar,,,19
+Apoio comunitário e social,Delegacia da Mulher,,,20
+Apoio comunitário e social,Procuradoria Geral do Município,,5591993033223,21
+Concessionárias,Equatorial,Energia elétrica,,22
+Concessionárias,SAAE,Água e esgoto,,23
+Concessionárias,Vivo,Telefonia e internet,,24
+Concessionárias,Claro,Telefonia e internet,,25
+Concessionárias,TIM,Telefonia e internet,,26
