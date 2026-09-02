@@ -177,6 +177,17 @@
   },
   {
     "categoria": "Alimentação",
+    "subcategoria": "Frango Assado / Peixe Frito / Churrasquinho",
+    "nome": "COQUEIRO - Sabor Amazônia",
+    "descricao": "Tambaqui assado na máquina sem espinha, Peixe frito",
+    "endereco": "Coqueiro - Rod. Marios Covas, 19 - frente ao Pedro Texeira",
+    "horario": "Quinta a domingo das 9h30 às 14h",
+    "entrega": "A combinar",
+    "telefone": 5591986022636,
+    "telefone2": 5591986022636
+  },
+  {
+    "categoria": "Alimentação",
     "subcategoria": "Lanchonetes / Hamburguerias",
     "nome": "MAGUARI - LL Doces e Salgados",
     "descricao": "Lanches, doces e salgados",
@@ -240,6 +251,17 @@
     "entrega": "Grátis",
     "telefone": 5591982104525,
     "telefone2": 5591989342089
+  },
+  {
+    "categoria": "Alimentação",
+    "subcategoria": "Padarias / Café / Doces & Salgados",
+    "nome": "CIDADE NOVA 2 - Didi Salgados",
+    "descricao": "Doces, salgados, tortas, bolos personalizados, atendemos eventos.",
+    "endereco": "Conj. Cidade Nova 2 - WE 14b, 431",
+    "horario": "Terça a domingo das 8h às 20h",
+    "entrega": "A combinar",
+    "telefone": 5591996298926,
+    "telefone2": 5591996298926
   },
   {
     "categoria": "Alimentação",
@@ -430,14 +452,14 @@
   },
   {
     "categoria": "Automotivo",
-    "subcategoria": "Estética Automotiva / Lava-jato",
-    "nome": "ESPAÇO VAGO para o seu negócio, Venha fazer parte da maior vitrine digital da região.",
-    "descricao": "ENTRE EM CONTATO",
-    "endereco": "ENTRE EM CONTATO",
-    "horario": "ENTRE EM CONTATO",
-    "entrega": "ENTRE EM CONTATO",
-    "telefone": 5591985554004,
-    "telefone2": 5591985554004
+    "subcategoria": "Estética automotiva Envelopamento  Lava-jato",
+    "nome": "ANANINDEUA - SR Envelopamento",
+    "descricao": "Envelopamento de Frotas, Comercial e Decorativo",
+    "endereco": "Ananindeua - Rua Cristo Redentor, 235 - Icuí",
+    "horario": "Segunda a sábado das 8h às 18h",
+    "entrega": "Trabalhamos com agendamento",
+    "telefone": 5591980416613,
+    "telefone2": 5591980416613
   },
   {
     "categoria": "Automotivo",
@@ -551,7 +573,7 @@
   },
   {
     "categoria": "Beleza & Estética",
-    "subcategoria": "Atêlier de  Costura / Alfaiataria / Curso de corte e costura",
+    "subcategoria": "Ateliê de  Costura / Alfaiataria / Curso de corte e costura",
     "nome": "TENONÉ - Atêlier Bee Queen",
     "descricao": "Corte & costura, ajustes, reparos...",
     "endereco": "Tenoné - Quinta linha, BOX 2",
@@ -562,14 +584,25 @@
   },
   {
     "categoria": "Beleza & Estética",
-    "subcategoria": "Atêlier de  Costura / Alfaiataria / Curso de corte e costura",
-    "nome": "MAGURI - Lourdes Atêlier e Escola de Corte & Costura",
+    "subcategoria": "Ateliê de  Costura / Alfaiataria / Curso de corte e costura",
+    "nome": "MAGUARI - Lourdes Atêlier e Escola de Corte & Costura",
     "descricao": "Curso de corte & costura, ajustes, reparos",
     "endereco": "Conj. Maguari - Principal - entre 25 e 26",
     "horario": "Segunda a sábado 8h30 às 12 e 15h às 19h",
     "entrega": "Presencial",
     "telefone": 5591992234219,
     "telefone2": 5591992234219
+  },
+  {
+    "categoria": "Beleza & Estética",
+    "subcategoria": "Ateliê de  Costura / Alfaiataria / Curso de corte e costura",
+    "nome": "SATÉLITE - Betania Pereira Ateliê",
+    "descricao": "Fabricante de peças esportivas femininas",
+    "endereco": "Conj. Satélite - WE 10, 1455",
+    "horario": "Segunda a sexta das 8h às 17h",
+    "entrega": "Presencial",
+    "telefone": 5591981064391,
+    "telefone2": 5591981064391
   },
   {
     "categoria": "Beleza & Estética",
@@ -617,7 +650,7 @@
   },
   {
     "categoria": "Beleza & Estética",
-    "subcategoria": "Manicure / Nails / Sobrancelhas",
+    "subcategoria": "Esmalteria / Nails / Sobrancelhas",
     "nome": "ESPAÇO VAGO para o seu negócio, Venha fazer parte da maior vitrine digital da região.",
     "descricao": "ENTRE EM CONTATO",
     "endereco": "ENTRE EM CONTATO",
@@ -680,6 +713,17 @@
     "entrega": "Presencial",
     "telefone": 5591980537927,
     "telefone2": 5591980537927
+  },
+  {
+    "categoria": "Beleza & Estética",
+    "subcategoria": "Salões de Beleza",
+    "nome": "COQUEIRO - Salão e Esmalteria Sobrinho Beauty",
+    "descricao": "Todos os procedimentos de salão de beleza, Nail designer, Manicure e Pedicure",
+    "endereco": "Conj. Satélite - avenida petencostal 01 .B",
+    "horario": "Segunda a sábado das 8h às 19h",
+    "entrega": "Presencial",
+    "telefone": 5591989194847,
+    "telefone2": 5591982153650
   },
   {
     "categoria": "Comércio",
@@ -947,6 +991,17 @@
   },
   {
     "categoria": "Educação",
+    "subcategoria": "Aulas particulares",
+    "nome": "SATÉLITE - Real Física Aulas Particulares",
+    "descricao": "Aulas particulares de Física e Matemática, Ensino fundamental II e Ensino Médio",
+    "endereco": "Conj. Satélite - WE 10, 286",
+    "horario": "Segund a sábado das 8h às 12 e das 14h às 18h",
+    "entrega": "Atende a domicílio",
+    "telefone": 5591999790283,
+    "telefone2": 5591999790283
+  },
+  {
+    "categoria": "Educação",
     "subcategoria": "Autoescolas",
     "nome": "ESPAÇO VAGO para o seu negócio, Venha fazer parte da maior vitrine digital da região.",
     "descricao": "ENTRE EM CONTATO",
@@ -1178,7 +1233,7 @@
   },
   {
     "categoria": "Moda & Acessórios",
-    "subcategoria": "Joias / Bijuterias",
+    "subcategoria": "Joias / Biojoias / Bijouterias",
     "nome": "MAGUARI - JoiaNela",
     "descricao": "Semijóias e folheados",
     "endereco": "Conj. Maguari - Principal, 50",
@@ -1186,6 +1241,17 @@
     "entrega": "A combinar",
     "telefone": 5591980162609,
     "telefone2": 5591981950755
+  },
+  {
+    "categoria": "Moda & Acessórios",
+    "subcategoria": "Joias / Biojoias / Bijouterias",
+    "nome": "ANANINDEUA - Amazônia Biojoias",
+    "descricao": "Acessórios em sementes",
+    "endereco": "Ananindeua - Av Ananin, bloco 4, 201",
+    "horario": "Segunda a sexta das 8h às 12h e das 14h às 18h",
+    "entrega": "A combinar",
+    "telefone": 5591985882734,
+    "telefone2": 5591985882734
   },
   {
     "categoria": "Moda & Acessórios",
@@ -1197,6 +1263,17 @@
     "entrega": "ENTRE EM CONTATO",
     "telefone": 5591985554004,
     "telefone2": 5591985554004
+  },
+  {
+    "categoria": "Moda & Acessórios",
+    "subcategoria": "Uniformes Profissionais Uniformes Escolares",
+    "nome": "COQUEIRO - TK Malharia",
+    "descricao": "Uniformes escolares, profissionais e esportivos, Camisas para eventos, Wind banner , Banner e Bandeiras",
+    "endereco": "Coqueiro -  Rua Osvaldo Cruz, 32",
+    "horario": "Segund a sábado das 8h às 12 e das 14h às 18h30",
+    "entrega": "A combinar",
+    "telefone": 5591982992284,
+    "telefone2": 5591982992284
   },
   {
     "categoria": "Moda & Acessórios",
@@ -1563,14 +1640,14 @@
   },
   {
     "categoria": "Saúde & Bem-estar",
-    "subcategoria": "Stúdio de Danças",
-    "nome": "ESPAÇO VAGO para o seu negócio, Venha fazer parte da maior vitrine digital da região.",
-    "descricao": "ENTRE EM CONTATO",
-    "endereco": "ENTRE EM CONTATO",
-    "horario": "ENTRE EM CONTATO",
-    "entrega": "ENTRE EM CONTATO",
-    "telefone": 5591985554004,
-    "telefone2": 5591985554004
+    "subcategoria": "Studio de Danças",
+    "nome": "SATÉLITE - Studio de Dança Petit Jeté",
+    "descricao": "Aulas de Ballet Clássico para Crianças, Jovens e Adultos",
+    "endereco": "Conj. Satélite - WE 11, 496",
+    "horario": "Segunda a sexta das 8h às 12h e das 14h às 19h",
+    "entrega": "Presencial",
+    "telefone": 5591983252891,
+    "telefone2": 5591983252891
   },
   {
     "categoria": "Serviços",
@@ -1651,7 +1728,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo / Contabilidade / Despachante",
+    "subcategoria": "Advocacia / Empréstimo / Contabilidade / Despachante",
     "nome": "MAGUARI - Focus Cred",
     "descricao": "Empréstimos, consignados, Financiamento...",
     "endereco": "Conj. Maguari - Principal esquina da 8",
@@ -1662,7 +1739,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo / Contabilidade / Despachante",
+    "subcategoria": "Advocacia / Empréstimo / Contabilidade / Despachante",
     "nome": "MAGUARI - Nazareno despachante",
     "descricao": "Serviços de despachante junto ao detran",
     "endereco": "Conj. Maguari - Alameda 3, 78",
@@ -1673,7 +1750,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo / Contabilidade / Despachante",
+    "subcategoria": "Advocacia / Empréstimo / Contabilidade / Despachante",
     "nome": "TENONÉ - Carlos Eduardo Contabilista",
     "descricao": "Serviços contábeis em geral",
     "endereco": "Tenoné - 1º de maio, 46 - Conj. Celso Daniel",
@@ -1684,7 +1761,7 @@
   },
   {
     "categoria": "Serviços",
-    "subcategoria": "Empréstimo / Contabilidade / Despachante",
+    "subcategoria": "Advocacia / Empréstimo / Contabilidade / Despachante",
     "nome": "SATÉLITE - Solange Abreu Serviços de Contabilidade",
     "descricao": "Abertura/baixa de empresas, declarações acessórias, dept de pessoal e RH",
     "endereco": "Conj. Satélite - WE 8, 775 - próximo da UBS",
@@ -1692,6 +1769,17 @@
     "entrega": "Visita ao cliente",
     "telefone": 5591983306746,
     "telefone2": 5591983306746
+  },
+  {
+    "categoria": "Serviços",
+    "subcategoria": "Advocacia / Empréstimo / Contabilidade / Despachante",
+    "nome": "COQUEIRO - Emerson Rodrigues Advocacia",
+    "descricao": "Prestação de serviços de advocacia, assessoria e consultoria jurídica.",
+    "endereco": "Coqueiro - Rua dos funcionários, 28.",
+    "horario": "Todos os dias das 8h às 18h",
+    "entrega": "Atende a domicílio",
+    "telefone": 5591992969462,
+    "telefone2": 5591992969462
   },
   {
     "categoria": "Serviços",
@@ -1754,7 +1842,7 @@
     "nome": "40 HORAS - JR Construção Eletricista Predial",
     "descricao": "Todos os serviços de eletricista: Quadro elético, luminárias, bombas, chuveiro.",
     "endereco": "40 Horas - Passagem Oliveira, 9",
-    "horario": "Segunda a sexta 6h30 às 17h",
+    "horario": "Segunda a sexta das 6h30 às 17h",
     "entrega": "Atende a domicílio",
     "telefone": 5591981791319,
     "telefone2": 5591981791319
@@ -1765,10 +1853,21 @@
     "nome": "40 HORAS - JR Construção Serviço de Pedreiro",
     "descricao": "Da fundação até a entrega das chaves",
     "endereco": "40 Horas - Passagem Oliveira, 9",
-    "horario": "Segunda a sexta 6h30 às 17h",
+    "horario": "Segunda a sexta das 6h30 às 17h",
     "entrega": "Atende a domicílio",
     "telefone": 5591981791319,
     "telefone2": 5591981791319
+  },
+  {
+    "categoria": "Serviços",
+    "subcategoria": "Pedreiro/Encanador  Eletricista / Pintor  Carpinteiro...",
+    "nome": "ICOARACI - Anderson Construções e Reformas",
+    "descricao": "Construção e reformas em geral",
+    "endereco": "Icoaraci -  passagem menino Deus, 137a",
+    "horario": "Segunda a sesta das 8h às 18h",
+    "entrega": "Atende a domicílio",
+    "telefone": 5591980707946,
+    "telefone2": 5591980707946
   },
   {
     "categoria": "Serviços",
@@ -1815,15 +1914,37 @@
     "telefone2": 5591999811179
   },
   {
-    "categoria": "",
-    "subcategoria": "",
-    "nome": "",
-    "descricao": "",
-    "endereco": "",
-    "horario": "",
-    "entrega": "",
-    "telefone": "",
-    "telefone2": ""
+    "categoria": "Serviços",
+    "subcategoria": "Internet / Entretenimento / Games / Streaming",
+    "nome": "SÃO BRÁS - TV Brás",
+    "descricao": "IPTV - canal fechado",
+    "endereco": "São Brás - Rua Benjamin Constant, Q7 - casa 7",
+    "horario": "24 horas - todos os dias",
+    "entrega": "Online",
+    "telefone": 5591988902168,
+    "telefone2": 5591989397090
+  },
+  {
+    "categoria": "Serviços",
+    "subcategoria": "Maquininha de cartão / Split de pagamento",
+    "nome": "MAGUARI - Split de pagamento Libberpay",
+    "descricao": "Soluções de pagamentos de cartão de crédito, débito, pixe e boleto, como forma de reduzir os custos,  através de ajuste fiscal tributário",
+    "endereco": "Passagem Newton Miranda, 132.",
+    "horario": "Segunda a sexta das 8h às 18h",
+    "entrega": "Grátis",
+    "telefone": 5591980732880,
+    "telefone2": 5591980732880
+  },
+  {
+    "categoria": "Educação",
+    "subcategoria": "Escolas Infantis / Fundamental / Ensino Médio",
+    "nome": "MAGUARI - Centro de Estudos Contemporâneo - CEEC",
+    "descricao": "Fundamental II (6o ao 9o ano) e Ensino Médio.",
+    "endereco": "Conj. Maguari - Principal entre 8 e 9",
+    "horario": "Segunda a sexta das 7h às 12h",
+    "entrega": "Presencial",
+    "telefone": 5591988458745,
+    "telefone2": 5591985089715
   },
   {
     "categoria": "",
