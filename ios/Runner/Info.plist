@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O ZapBairro usa sua localização para mostrar os comércios mais perto de você, a distância até cada um e a sua posição no mapa do bairro. Ela fica só no seu celular: não é salva nem enviada.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

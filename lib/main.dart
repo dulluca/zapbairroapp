@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 // import 'splash_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'coordenadas.dart';
+import 'horario.dart';
+import 'localizacao.dart';
+import 'loja.dart';
 import 'servicos.dart';
+import 'tela_mapa.dart';
 
 // Senha de acesso ao painel administrativo (área oculta).
 // >>> TROQUE por uma senha sua. <<<
@@ -114,6 +120,59 @@ class _TelaCategoriasState extends State<TelaCategorias> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const TelaFavoritos()),
+    );
+  }
+
+  // MAPA DO BAIRRO: todas as lojas com localização, perto de quem está vendo.
+  void _abrirMapa() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaMapa()),
+    );
+  }
+
+  Widget _cartaoMapa() {
+    return Card(
+      elevation: 3,
+      color: Colors.green[50],
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.green[700]!, width: 1.2),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: _abrirMapa,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Icons.map, color: Colors.green[800], size: 30),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mapa do bairro',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Veja o que está perto de você e aberto agora',
+                      style: TextStyle(fontSize: 13, color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, color: Colors.green[700], size: 18),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -404,7 +463,9 @@ class _TelaCategoriasState extends State<TelaCategorias> {
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
+            _cartaoMapa(),
+            const SizedBox(height: 16),
             const Text(
               'Explore por Categorias',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -521,6 +582,43 @@ class TelaSubcategorias extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Atalhos da categoria inteira: a lista do mais perto para o mais
+            // longe e o mapa só com as lojas desta categoria.
+            Row(
+              children: [
+                Expanded(
+                  child: _botaoAtalho(
+                    icone: Icons.near_me,
+                    texto: 'Perto de mim',
+                    cor: Colors.blue[700]!,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TelaComercios(
+                          categoriaNome: categoriaNome,
+                          pertoDeMim: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _botaoAtalho(
+                    icone: Icons.map,
+                    texto: 'Ver no mapa',
+                    cor: Colors.green[800]!,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TelaMapa(categoriaNome: categoriaNome),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
             const Text(
               'Escolha uma especialidade:',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -587,6 +685,28 @@ class TelaSubcategorias extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _botaoAtalho({
+    required IconData icone,
+    required String texto,
+    required Color cor,
+    required VoidCallback onTap,
+  }) {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: cor,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      icon: Icon(icone),
+      label: Text(
+        texto,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+      ),
+      onPressed: onTap,
     );
   }
 }
@@ -719,24 +839,48 @@ class LinhaAvaliacao extends StatelessWidget {
 }
 
 // --- TELA 2: LISTA DE COMÉRCIOS (FILTRANDO DUPLICADOS PELO NOME) ---
-class TelaComercios extends StatelessWidget {
+class TelaComercios extends StatefulWidget {
   final String categoriaNome;
   final String? subcategoriaNome;
   final String? termoBusca;
+
+  /// Aberta pelo botão "Perto de mim": pede a localização logo na entrada.
+  final bool pertoDeMim;
 
   const TelaComercios({
     super.key,
     required this.categoriaNome,
     this.subcategoriaNome,
     this.termoBusca,
+    this.pertoDeMim = false,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final termo = (termoBusca ?? '').trim();
-    final buscando = termo.isNotEmpty;
-    final palavras = palavrasDaBusca(termo);
+  State<TelaComercios> createState() => _TelaComerciosState();
+}
 
+class _TelaComerciosState extends State<TelaComercios> {
+  late final Stream<QuerySnapshot> _comercios;
+  Coordenada? _posicao = LocalizacaoService.ultima;
+  bool _buscandoPosicao = false;
+  bool _soAbertos = false;
+
+  // Lojas da última leitura, para o botão do mapa abrir com as mesmas.
+  List<LojaInfo> _lojasNaTela = const [];
+
+  String get _termo => (widget.termoBusca ?? '').trim();
+  bool get _buscando => _termo.isNotEmpty;
+
+  String get _titulo => _buscando
+      ? 'Resultados para: "$_termo"'
+      : (widget.subcategoriaNome ??
+            (widget.pertoDeMim
+                ? '${widget.categoriaNome} perto de mim'
+                : widget.categoriaNome));
+
+  @override
+  void initState() {
+    super.initState();
     Query query = FirebaseFirestore.instance.collection('comercios');
 
     // Na busca por texto lemos a coleção inteira e filtramos aqui no app.
@@ -744,26 +888,142 @@ class TelaComercios extends StatelessWidget {
     // maiúscula iguais), então quem digitava "acai" ou "pizza" nunca achava
     // nada: os nomes começam com o conjunto ("MAGUARI - ...") e o termo que
     // interessa costuma estar na descrição ou na subcategoria.
-    if (!buscando) {
-      query = query.where('categoria', isEqualTo: categoriaNome);
-      if (subcategoriaNome != null) {
-        query = query.where('subcategoria', isEqualTo: subcategoriaNome);
+    if (!_buscando) {
+      query = query.where('categoria', isEqualTo: widget.categoriaNome);
+      if (widget.subcategoriaNome != null) {
+        query = query.where('subcategoria', isEqualTo: widget.subcategoriaNome);
       }
     }
+    _comercios = query.snapshots();
+    _iniciarLocalizacao();
+  }
+
+  // O pedido de localização do sistema só aparece sozinho quando o morador
+  // tocou em "Perto de mim" ou na primeira lista de categoria que ele abre.
+  // Nas outras vezes usamos a permissão que já existe, sem perguntar de novo.
+  Future<void> _iniciarLocalizacao() async {
+    final pedir =
+        widget.pertoDeMim ||
+        (!_buscando && !await LocalizacaoService.jaPediu());
+    await _atualizarPosicao(pedir: pedir, avisar: widget.pertoDeMim);
+  }
+
+  Future<void> _atualizarPosicao({
+    required bool pedir,
+    bool avisar = false,
+  }) async {
+    if (_buscandoPosicao || !mounted) return;
+    setState(() => _buscandoPosicao = true);
+    final resultado = await LocalizacaoService.posicaoAtual(
+      pedirPermissao: pedir,
+    );
+    if (!mounted) return;
+    setState(() {
+      _buscandoPosicao = false;
+      if (resultado.ok) _posicao = resultado.posicao;
+    });
+    if (!resultado.ok && avisar) _avisarSemLocalizacao(resultado.estado);
+  }
+
+  void _avisarSemLocalizacao(EstadoLocalizacao estado) {
+    final ajustes =
+        estado == EstadoLocalizacao.negadaParaSempre ||
+        estado == EstadoLocalizacao.gpsDesligado;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(LocalizacaoService.explicar(estado)),
+        action: ajustes
+            ? SnackBarAction(
+                label: 'Ajustes',
+                onPressed: () => LocalizacaoService.abrirAjustes(estado),
+              )
+            : null,
+      ),
+    );
+  }
+
+  void _abrirMapa() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaMapa(lojas: _lojasNaTela, titulo: _titulo),
+      ),
+    );
+  }
+
+  // Filtros logo abaixo da barra: perto de mim, aberto agora e o mapa.
+  Widget _barraDeFiltros() {
+    final perto = _posicao != null;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          FilterChip(
+            avatar: _buscandoPosicao
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    Icons.near_me,
+                    size: 18,
+                    color: perto ? Colors.white : Colors.blue[700],
+                  ),
+            showCheckmark: false,
+            label: Text(perto ? 'Mais perto primeiro' : 'Perto de mim'),
+            labelStyle: TextStyle(
+              color: perto ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+            selected: perto,
+            selectedColor: Colors.blue[700],
+            onSelected: (_) => _atualizarPosicao(pedir: true, avisar: true),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            avatar: Icon(
+              Icons.schedule,
+              size: 18,
+              color: _soAbertos ? Colors.white : Colors.green[800],
+            ),
+            showCheckmark: false,
+            label: const Text('Aberto agora'),
+            labelStyle: TextStyle(
+              color: _soAbertos ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+            selected: _soAbertos,
+            selectedColor: Colors.green[700],
+            onSelected: (valor) => setState(() => _soAbertos = valor),
+          ),
+          const SizedBox(width: 8),
+          ActionChip(
+            avatar: Icon(Icons.map, size: 18, color: Colors.green[800]),
+            label: const Text(
+              'Ver no mapa',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            onPressed: _abrirMapa,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palavras = palavrasDaBusca(_termo);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          buscando
-              ? 'Resultados para: "$termo"'
-              : (subcategoriaNome ?? categoriaNome),
-          style: const TextStyle(color: Colors.white),
-        ),
+        title: Text(_titulo, style: const TextStyle(color: Colors.white)),
         backgroundColor: Colors.green[700],
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: query.snapshots(),
+        stream: _comercios,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -772,7 +1032,7 @@ class TelaComercios extends StatelessWidget {
           final docsBrutos = snapshot.data?.docs ?? [];
           final nomesVistos = <String>{};
           final relevancias = <String, int>{};
-          final listaComercios = <QueryDocumentSnapshot>[];
+          final lojas = <LojaInfo>[];
 
           for (final doc in docsBrutos) {
             final dados = doc.data() as Map<String, dynamic>;
@@ -788,116 +1048,144 @@ class TelaComercios extends StatelessWidget {
             if (relevancia == 0) continue;
 
             relevancias[doc.id] = relevancia;
-            listaComercios.add(doc);
+            lojas.add(LojaInfo(doc.id, dados));
           }
 
-          if (buscando) {
-            // Quem casa pelo nome vem primeiro, depois por tipo; dentro da
-            // mesma relevância, ordem alfabética.
-            listaComercios.sort((a, b) {
+          // Ordem: na busca, quem casa pelo nome vem primeiro; com a posição
+          // do morador, do mais perto para o mais longe; no empate, por nome.
+          final posicao = _posicao;
+          lojas.sort((a, b) {
+            if (_buscando) {
               final diferenca =
                   (relevancias[b.id] ?? 0) - (relevancias[a.id] ?? 0);
               if (diferenca != 0) return diferenca;
+            }
+            if (posicao != null) {
+              final porDistancia = compararPorDistancia(a, b, posicao);
+              if (porDistancia != 0) return porDistancia;
+            }
+            return normalizarTexto(a.nome).compareTo(normalizarTexto(b.nome));
+          });
+          _lojasNaTela = lojas;
 
-              final nomeA = ((a.data() as Map<String, dynamic>)['nome'] ?? '')
-                  .toString();
-              final nomeB = ((b.data() as Map<String, dynamic>)['nome'] ?? '')
-                  .toString();
-              return normalizarTexto(nomeA).compareTo(normalizarTexto(nomeB));
-            });
-          }
+          final agora = DateTime.now();
+          final visiveis = _soAbertos
+              ? lojas.where((l) => l.abertaEm(agora)).toList()
+              : lojas;
 
-          if (listaComercios.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Text(
-                  buscando
-                      ? 'Nenhum comércio encontrado para "$termo".'
-                      : (subcategoriaNome != null
-                            ? 'Nenhum comércio em $subcategoriaNome.'
-                            : 'Nenhum comércio em $categoriaNome.'),
-                  textAlign: TextAlign.center,
-                ),
+          return Column(
+            children: [
+              _barraDeFiltros(),
+              Expanded(
+                child: visiveis.isEmpty
+                    ? _listaVazia(lojas.isNotEmpty)
+                    : _lista(visiveis, agora),
               ),
-            );
-          }
-
-          // Notas da comunidade, para mostrar a média de cada loja na lista.
-          return StreamBuilder<Map<String, ResumoAvaliacoes>>(
-            stream: AvaliacaoService.resumoPorLoja(),
-            builder: (context, snapNotas) {
-              final resumos =
-                  snapNotas.data ?? const <String, ResumoAvaliacoes>{};
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16.0),
-                itemCount: listaComercios.length,
-                itemBuilder: (context, index) {
-                  final dados =
-                      listaComercios[index].data() as Map<String, dynamic>;
-                  final loja = {...dados, 'id': listaComercios[index].id};
-                  final resumo =
-                      resumos[AvaliacaoService.chaveLojaAvaliada(
-                        dados['nome'],
-                      )] ??
-                      ResumoAvaliacoes.vazio;
-
-                  return Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      title: Text(
-                        dados['nome'] ?? 'Sem nome',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            dados['descricao'] ?? 'Sem descrição',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-                          LinhaAvaliacao(resumo: resumo, tamanho: 15),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          BotaoFavorito(loja: loja),
-                          const Icon(
-                            Icons.arrow_forward_ios,
-                            color: Colors.green,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TelaDetalhes(
-                              dadosComercio: dados,
-                              comercioId: listaComercios[index].id,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              );
-            },
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _listaVazia(bool soFaltamAbertas) {
+    final String texto;
+    if (soFaltamAbertas) {
+      texto = 'Nenhuma loja desta lista está aberta agora.';
+    } else if (_buscando) {
+      texto = 'Nenhum comércio encontrado para "$_termo".';
+    } else {
+      texto =
+          'Nenhum comércio em ${widget.subcategoriaNome ?? widget.categoriaNome}.';
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Text(texto, textAlign: TextAlign.center),
+      ),
+    );
+  }
+
+  Widget _lista(List<LojaInfo> lojas, DateTime agora) {
+    // Notas da comunidade, para mostrar a média de cada loja na lista.
+    return StreamBuilder<Map<String, ResumoAvaliacoes>>(
+      stream: AvaliacaoService.resumoPorLoja(),
+      builder: (context, snapNotas) {
+        final resumos = snapNotas.data ?? const <String, ResumoAvaliacoes>{};
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: lojas.length,
+          itemBuilder: (context, index) {
+            final loja = lojas[index];
+            final dados = loja.dados;
+            final resumo =
+                resumos[AvaliacaoService.chaveLojaAvaliada(dados['nome'])] ??
+                ResumoAvaliacoes.vazio;
+            final distancia = loja.distanciaDe(_posicao);
+
+            return Card(
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(16),
+                title: Text(
+                  dados['nome'] ?? 'Sem nome',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      dados['descricao'] ?? 'Sem descrição',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: SeloFuncionamento(status: loja.statusEm(agora)),
+                        ),
+                        if (distancia != null) ...[
+                          const SizedBox(width: 10),
+                          SeloDistancia(metros: distancia),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    LinhaAvaliacao(resumo: resumo, tamanho: 15),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    BotaoFavorito(loja: {...dados, 'id': loja.id}),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.green,
+                      size: 18,
+                    ),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          TelaDetalhes(dadosComercio: dados, comercioId: loja.id),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -943,7 +1231,7 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
     final nome = dadosComercio['nome'] ?? 'Sem nome';
     final descricao = dadosComercio['descricao'] ?? 'Sem descrição';
     final endereco = dadosComercio['endereco'] ?? 'Endereço não informado';
-    final horario = dadosComercio['horario'] ?? 'Horário não informado';
+    final loja = LojaInfo(widget.comercioId ?? '', dadosComercio);
     final entrega = dadosComercio['entrega'] ?? 'Não informado';
     final tel1 = dadosComercio['telefone'] ?? '';
     final tel2 = dadosComercio['telefone2'] ?? '';
@@ -982,7 +1270,8 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
             const Divider(height: 30, thickness: 1),
 
             buildInfoRow(Icons.location_on, 'Endereço', endereco),
-            buildInfoRow(Icons.access_time, 'Horário de Atendimento', horario),
+            if (loja.coordenada != null) _blocoMapa(loja.coordenada!),
+            _blocoHorario(loja),
             buildInfoRow(Icons.delivery_dining, 'Taxa de Entrega', entrega),
 
             const SizedBox(height: 10),
@@ -1049,6 +1338,148 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
             _secaoAvaliacoes(nome),
           ],
         ),
+      ),
+    );
+  }
+
+  // Mapa pequeno com o pino da loja, a distância e o "Como chegar".
+  Widget _blocoMapa(Coordenada destino) {
+    final ponto = LatLng(destino.latitude, destino.longitude);
+    final origem = LocalizacaoService.ultima;
+    final distancia = origem == null ? null : distanciaMetros(origem, destino);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 170,
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(target: ponto, zoom: 16),
+                markers: {
+                  Marker(markerId: const MarkerId('loja'), position: ponto),
+                },
+                // Só ilustra: arrastar o mapa aqui brigaria com a rolagem da
+                // tela. O mapa navegável é o "Mapa do bairro".
+                liteModeEnabled: true,
+                zoomControlsEnabled: false,
+                myLocationButtonEnabled: false,
+                mapToolbarEnabled: false,
+                scrollGesturesEnabled: false,
+                zoomGesturesEnabled: false,
+                rotateGesturesEnabled: false,
+                tiltGesturesEnabled: false,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (distancia != null) ...[
+                SeloDistancia(metros: distancia, tamanho: 15),
+                const SizedBox(width: 4),
+                Text('de você', style: TextStyle(color: Colors.grey[700])),
+              ],
+              const Spacer(),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.blue[800],
+                  side: BorderSide(color: Colors.blue[700]!),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.directions),
+                label: const Text(
+                  'Como chegar',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => abrirComoChegar(destino),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Horário da semana, com o selo de aberto/fechado e o dia de hoje em negrito.
+  Widget _blocoHorario(LojaInfo loja) {
+    final horario = loja.horario;
+    final agora = DateTime.now();
+    final hoje = agora.weekday - 1;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.access_time, color: Colors.green[700], size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Horário de Atendimento',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (horario == null)
+                  const Text(
+                    'Horário não informado',
+                    style: TextStyle(fontSize: 16, color: Colors.black87),
+                  )
+                else ...[
+                  SeloFuncionamento(status: horario.statusEm(agora), tamanho: 15),
+                  const SizedBox(height: 8),
+                  for (var dia = 0; dia < 7; dia++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              kNomesDias[dia],
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: dia == hoje
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              horario.textoDoDia(dia),
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: horario.dias[dia].isEmpty
+                                    ? Colors.grey[600]
+                                    : Colors.black87,
+                                fontWeight: dia == hoje
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1288,8 +1719,13 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
 
 void abrirWhatsApp(String telefone) async {
   String numeroLimpo = telefone.replaceAll(RegExp(r'[^0-9]'), '');
+  // A planilha já traz o DDI (5591...): o 55 só entra quando o número veio
+  // sem ele. Antes o app sempre somava o 55 e o link saía 555591...
+  if (!(numeroLimpo.startsWith('55') && numeroLimpo.length >= 12)) {
+    numeroLimpo = '55$numeroLimpo';
+  }
   const String mensagem = "Olá! Vim pelo aplicativo ZapBairro.";
-  Uri whatsappUrl = Uri.https("wa.me", "/55$numeroLimpo", {"text": mensagem});
+  Uri whatsappUrl = Uri.https("wa.me", "/$numeroLimpo", {"text": mensagem});
 
   if (await canLaunchUrl(whatsappUrl)) {
     await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);

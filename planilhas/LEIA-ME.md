@@ -6,7 +6,7 @@ existe **um CSV para cada lista**:
 
 | Arquivo          | Vira a lista  | Colunas (a ordem nao importa, o nome sim)                                             |
 |------------------|---------------|---------------------------------------------------------------------------------------|
-| `lojistas.csv`   | `"lojistas"`  | categoria, subcategoria, nome, descricao, endereco, horario, entrega, telefone, telefone2 |
+| `lojistas.csv`   | `"lojistas"`  | categoria, subcategoria, nome, descricao, endereco, localizacao, horario, seg, ter, qua, qui, sex, sab, dom, entrega, telefone, telefone2 |
 | `emergencia.csv` | `"emergencia"`| secao, nome, descricao, telefone, ordem                                               |
 | `avisos.csv`     | `"avisos"`    | secao, titulo, mensagem, data, ordem                                                  |
 
@@ -30,6 +30,36 @@ converta e cole de volta.
 - **Campo vazio**: deixe a celula em branco (vira `""`). Nao escreva "null" nem "-".
 - **Virgula, aspas ou quebra de linha dentro do texto**: pode usar. Ao salvar como
   CSV a planilha ja poe as aspas sozinha — nao mexa nelas na mao.
+
+## Localizacao e horario das lojas (versao 1.1 do app)
+
+Sao essas colunas que fazem funcionar o **"Perto de mim"** (lista do mais
+perto para o mais longe, com a distancia), o **"Aberto agora"** e o **Mapa do
+bairro**. Loja sem essas colunas continua aparecendo normalmente, so que sem
+distancia, sem pino no mapa e com "Horario nao informado".
+
+- **`localizacao`**: a coordenada da loja, do jeito que o Google Maps copia:
+  `-1.33186, -48.44317` (latitude, longitude, com ponto).
+  Como pegar: no Google Maps, **segure o dedo em cima da loja** (no computador,
+  clique com o botao direito) -> aparecem os numeros no topo -> toque neles
+  para copiar -> cole na celula. Vazio = loja fora do mapa e sem distancia.
+- **`seg`, `ter`, `qua`, `qui`, `sex`, `sab`, `dom`**: o horario de cada dia,
+  no formato `08:00-18:00`. Dois turnos: `08:00-12:00 e 14:00-18:00`.
+  - Fechado no dia: deixe a celula **vazia**.
+  - Aberto o dia todo: `24h`.
+  - Passa da meia-noite: `19:00-01:00` (fecha a 1h do dia seguinte).
+  - Ate meia-noite: `18:00-24:00`.
+  - **Todos os sete dias vazios** = o app mostra "Horario nao informado".
+  - Formate essas colunas como **Texto** antes de digitar, para o Excel nao
+    transformar `08:00` em hora/numero.
+- **`horario`** (texto livre, ex.: "Segunda a sabado das 8h as 18h"): so a
+  versao 1.0 do app, que ainda esta nas lojas, usa essa coluna. Pode manter
+  como esta; quando todo mundo estiver na 1.1, ela pode sair.
+- Em 2026-10-06 os horarios em texto foram convertidos para as colunas dos
+  dias (137 lojas). As que estavam vazias ou com "ENTRE EM CONTATO" ficaram
+  sem horario, e nenhuma loja tem `localizacao` ainda.
+- O teste `flutter test test/coordenadas_test.dart` confere se todo horario e
+  toda localizacao do `lojistas.json` estao num formato que o app entende.
 
 ## Como converter no csvjson.com
 
