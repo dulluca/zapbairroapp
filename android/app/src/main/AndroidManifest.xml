@@ -20,7 +20,7 @@
         <!-- Chave do Google Maps (projeto Firebase do ZapBairro). Ver docs/MAPA_GOOGLE.md -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="COLE_AQUI_A_CHAVE_DO_GOOGLE_MAPS" />
+            android:value="AIzaSyDRjjo7jZHMJN37TZ-LoQYpYgS-OvMt3M8" />
         <activity
             android:name="com.example.zapbairro_fix.MainActivity"
             android:exported="true"
