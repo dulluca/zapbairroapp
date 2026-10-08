@@ -55,9 +55,25 @@ distancia, sem pino no mapa e com "Horario nao informado".
 - **`horario`** (texto livre, ex.: "Segunda a sabado das 8h as 18h"): so a
   versao 1.0 do app, que ainda esta nas lojas, usa essa coluna. Pode manter
   como esta; quando todo mundo estiver na 1.1, ela pode sair.
-- Em 2026-10-06 os horarios em texto foram convertidos para as colunas dos
-  dias (137 lojas). As que estavam vazias ou com "ENTRE EM CONTATO" ficaram
-  sem horario, e nenhuma loja tem `localizacao` ainda.
+- Em 2026-10-08 o `lojistas.json` foi refeito a partir do que estava no
+  Firestore (242 lojas: o arquivo do repositorio estava velho, com 228) e os
+  horarios em texto viraram as colunas dos dias (156 lojas). As que estavam
+  vazias ou com "ENTRE EM CONTATO" ficaram sem horario, e nenhuma loja tem
+  `localizacao` ainda. **Use este arquivo (ou `planilhas/lojistas.csv`) como
+  base daqui para frente**: importar uma copia antiga apaga as lojas novas e
+  os horarios.
+
+## O importar.dart protege as visitas
+
+- Antes de apagar `comercios`, ele le o contador de visitas de cada loja e
+  devolve para a mesma loja (nome + categoria + subcategoria; se a loja mudou
+  de categoria, vai pelo nome). Loja que saiu do JSON perde o contador e o
+  importador avisa.
+- Toda importacao de lojistas salva antes uma copia do Firestore em
+  `backups/comercios-<data>.json` (fora do git).
+- Para ver o que vai acontecer sem gravar nada:
+  `dart run importar.dart lojistas --simular`. Se o numero de lojas do backup
+  for maior que o do JSON, pare: o Firestore tem lojas que o arquivo nao tem.
 - O teste `flutter test test/coordenadas_test.dart` confere se todo horario e
   toda localizacao do `lojistas.json` estao num formato que o app entende.
 
