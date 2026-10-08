@@ -163,6 +163,16 @@ void main(List<String> argumentos) async {
 
   // 4. Envia so os blocos pedidos
   for (final bloco in aImportar) {
+    // Lista vazia nunca apaga a colecao: o lojistas.json no formato antigo
+    // (lista solta de lojistas) nao tem emergencia nem avisos, e importar
+    // sem argumento apagava os dois do app.
+    if (bloco.itens(conteudo).isEmpty) {
+      print(
+        '⏭️ "${bloco.chave}" está vazia no lojistas.json: '
+        '"${bloco.colecao}" fica como está no Firestore.',
+      );
+      continue;
+    }
     if (bloco.chave == 'lojistas') {
       await _importarLojistas(bloco, bloco.itens(conteudo), simular: simular);
     } else if (simular) {
