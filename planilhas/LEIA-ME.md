@@ -11,7 +11,7 @@ existe **um CSV para cada lista**:
 | `avisos.csv`     | `"avisos"`    | secao, titulo, mensagem, data, ordem                                                  |
 
 Os tres arquivos ja vem preenchidos com **tudo o que esta hoje no
-lojistas.json** (228 lojistas, 26 emergencias, 14 avisos). Edite a planilha,
+lojistas.json** (242 lojistas, 9 emergencias, 14 avisos, conferidos com o Firestore em 2026-10-08). Edite a planilha,
 converta e cole de volta.
 
 ## Regras das colunas
