@@ -124,4 +124,24 @@ void main() {
     expect(h.textoDoDia(0), '08:00 às 12:00, 14:00 às 18:00');
     expect(h.textoDoDia(6), 'Fechado');
   });
+
+  group('agoraNoBairro', () {
+    test('converte para Belém (UTC-3) qualquer que seja o fuso', () {
+      // 2026-10-10 01:30 UTC = 2026-10-09 22:30 em Belém (sexta-feira).
+      final belem = agoraNoBairro(DateTime.utc(2026, 10, 10, 1, 30));
+      expect(belem.year, 2026);
+      expect(belem.month, 10);
+      expect(belem.day, 9);
+      expect(belem.hour, 22);
+      expect(belem.minute, 30);
+      expect(belem.weekday, DateTime.friday);
+    });
+
+    test('revisor nos EUA às 21h vê a loja fechada se em Belém já passou', () {
+      final ate22h = HorarioSemana.doComercio(semana('08:00-22:00'))!;
+      // 21h em Los Angeles (UTC-7) = 04:00 UTC = 01:00 em Belém.
+      final agora = agoraNoBairro(DateTime.utc(2026, 10, 6, 4, 0));
+      expect(ate22h.statusEm(agora).aberto, isFalse);
+    });
+  });
 }

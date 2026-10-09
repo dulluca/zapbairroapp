@@ -24,6 +24,18 @@ const List<String> kNomesDias = [
 
 const int _minutosNoDia = 24 * 60;
 
+/// Agora no relógio do bairro (Belém, UTC-3 o ano todo: o Brasil não tem
+/// horário de verão desde 2019). O horário das lojas é o de Belém, então o
+/// "aberto agora" não pode seguir o fuso do celular: quem abre o app de outro
+/// fuso (o revisor da Apple, um morador viajando) veria a loja aberta ou
+/// fechada na hora errada.
+DateTime agoraNoBairro([DateTime? instante]) {
+  final belem = (instante ?? DateTime.now()).toUtc().subtract(
+    const Duration(hours: 3),
+  );
+  return DateTime(belem.year, belem.month, belem.day, belem.hour, belem.minute);
+}
+
 /// Um turno do dia, em minutos desde 00:00. Quando [fim] <= [inicio] o turno
 /// atravessa a meia-noite e termina no dia seguinte.
 class Intervalo {

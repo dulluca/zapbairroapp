@@ -20,6 +20,9 @@ on:
 env:
   IOS_BUNDLE_ID: com.zapbairro.zapbairro
   FLUTTER_VERSION: 3.47.6
+  # Centro do Conjunto Maguari (Belem/PA): o "morador" das capturas do mapa e
+  # do "perto de mim" fica aqui.
+  LOCALIZACAO_SIMULADA: "-1.33186,-48.44317"
 
 jobs:
   capturas:
@@ -128,6 +131,14 @@ jobs:
           # `simctl io booted`, que fica ambiguo se houver outro de pe.
           xcrun simctl shutdown all 2>/dev/null || true
 
+          # O simulador usa o fuso do Mac. No fuso de Belem o "aberto agora"
+          # das capturas bate com o horario das lojas; no UTC do runner elas
+          # sairiam fechadas a tarde. Rode o workflow em horario comercial
+          # de Brasilia para as lojas aparecerem abertas.
+          sudo systemsetup -settimezone America/Belem >/dev/null 2>&1 || true
+          echo "Fuso do runner: $(date +%Z) $(date +%H:%M)"
+
+
           # A Simulator.app precisa estar aberta. Sem ela, o boot puro do
           # simctl no runner headless para antes de subir o SpringBoard --
           # foi ai que o `simctl bootstatus -b` ficou 59 minutos esperando um
@@ -168,6 +179,12 @@ jobs:
             --wifiBars 3 \
             --batteryState charged \
             --batteryLevel 100 || true
+
+          # O morador das capturas fica no centro do bairro, e a localizacao
+          # ja vem liberada para o app (que ainda nem foi instalado): o alerta
+          # de permissao do iOS nunca aparece, nem na foto.
+          xcrun simctl location "$udid" set "$LOCALIZACAO_SIMULADA" || true
+          xcrun simctl privacy "$udid" grant location "$IOS_BUNDLE_ID" || true
 
       - name: Gerar as capturas
         # 35min: cabe o pior caso das duas tentativas do drive (cao de guarda
@@ -375,7 +392,7 @@ jobs:
           # As capturas que o teste tenta gerar, na ordem. Uma faltando
           # significa que aquele grupo falhou ou foi pulado no simulador --
           # o log do passo "Gerar as capturas" diz o motivo exato.
-          esperadas="01-inicio 02-busca 03-detalhes 04-avaliar 05-favoritos 06-especialidades 07-utilidades-emergencias 08-avisos-comunitarios"
+          esperadas="01-inicio 02-mapa 03-perto-de-mim 04-aberto-agora 05-detalhes 06-especialidades 07-busca 08-favoritos 09-utilidades-emergencias 10-avisos-comunitarios"
           for nome in $esperadas; do
             if [ ! -f "screenshots/$nome.png" ]; then
               echo "::warning::Captura esperada nao saiu: $nome.png (o grupo dela falhou ou foi pulado; veja o log do drive)."

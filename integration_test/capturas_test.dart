@@ -45,13 +45,24 @@
 // NAO existe captura do rodape dos detalhes: numa tela de 6,9 polegadas os
 // detalhes cabem inteiros (avaliacoes e botao incluidos) e a foto saia
 // identica a dos detalhes.
+//
+// 5. Versao 1.1 (mapa, perto de mim, aberto agora): o workflow concede a
+//    permissao de localizacao antes de o app abrir, poe o simulador no centro
+//    do Conjunto Maguari e o relogio no fuso de Belem. Sem isso o alerta de
+//    permissao do iOS sairia na foto e o "aberto agora" seguiria o UTC do
+//    runner. As capturas do mapa esperam alguns segundos a mais: os blocos do
+//    Google Maps chegam pela rede e nao ha widget Flutter que prove que
+//    terminaram de desenhar.
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:zapbairro/loja.dart';
 import 'package:zapbairro/main.dart';
+import 'package:zapbairro/tela_mapa.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -103,7 +114,11 @@ void main() {
     // So anuncia a captura quando todas as provas estao na tela e nenhum
     // spinner continua girando. Se algo nao chegar no prazo, pula com log e
     // o workflow avisa que a captura nao saiu.
-    Future<void> capturar(String nome, {required List<Finder> provas}) async {
+    Future<void> capturar(
+      String nome, {
+      required List<Finder> provas,
+      int esperaExtraDecimos = 0,
+    }) async {
       for (final prova in provas) {
         final apareceu = await esperarAte(
           tester,
@@ -126,8 +141,8 @@ void main() {
         return;
       }
       // Um suspiro para a moldura terminar de desenhar (imagens, estrelas)
-      // antes do sinal.
-      await respirar(tester);
+      // antes do sinal. Mapas pedem mais: os blocos vem pela rede.
+      await respirar(tester, decimos: 5 + esperaExtraDecimos);
 
       // O workflow fotografa ao ver esta linha e confirma criando o arquivo
       // abaixo dentro do container do app. Seguramos a tela ate a confirmacao
@@ -189,40 +204,102 @@ void main() {
     );
 
     // ---------------------------------------------------------------- 1
-    // Tela inicial: acoes, busca e a grade de categorias.
+    // Tela inicial: acoes, busca, o cartao do mapa e a grade de categorias.
     await grupo('inicio', () async {
       await abrirDoZero();
-      await capturar('01-inicio', provas: [find.text('Explore por Categorias')]);
+      await capturar(
+        '01-inicio',
+        provas: [find.text('Explore por Categorias'), find.text('Mapa do bairro')],
+      );
     });
 
     // ---------------------------------------------------------------- 2
-    // Busca por texto e, na mesma corrida, os detalhes de um resultado e a
-    // caixa de avaliacao. O termo vai sem acento de proposito: a captura
-    // mostra que "acai" encontra "Acai".
-    await grupo('busca, detalhes e avaliacao', () async {
+    // Mapa do bairro: pinos das lojas (verde aberta, vermelho fechada) em
+    // volta da posicao do morador.
+    await grupo('mapa do bairro', () async {
       await abrirDoZero();
-      await buscar('acai');
-      await capturar('02-busca', provas: [resultadoDaBusca]);
-
-      if (resultadoDaBusca.evaluate().isEmpty) {
-        debugPrint('### nenhuma loja no resultado, pulando detalhes');
-        return;
-      }
-      await tester.tap(resultadoDaBusca.first);
-      await capturar('03-detalhes', provas: [find.byType(TelaDetalhes)]);
-
-      final avaliar = find.text('Avaliar esta loja');
-      if (avaliar.evaluate().isEmpty) {
-        debugPrint('### botao "Avaliar esta loja" nao encontrado');
-        return;
-      }
-      await tester.ensureVisible(avaliar);
-      await respirar(tester);
-      await tester.tap(avaliar);
-      await capturar('04-avaliar', provas: [find.byType(AlertDialog)]);
+      await tester.tap(find.text('Mapa do bairro'));
+      await capturar(
+        '02-mapa',
+        provas: [
+          find.descendant(
+            of: find.byType(TelaMapa),
+            matching: find.byType(GoogleMap),
+          ),
+          find.descendant(
+            of: find.byType(TelaMapa),
+            matching: find.textContaining('no mapa'),
+          ),
+        ],
+        esperaExtraDecimos: 60,
+      );
     });
 
     // ---------------------------------------------------------------- 3
+    // Categoria: as especialidades com os atalhos da categoria inteira, a
+    // lista "perto de mim" com a distancia, o filtro "aberto agora" e os
+    // detalhes da loja mais perto (horario da semana, mapa e como chegar).
+    await grupo('perto de mim e aberto agora', () async {
+      await abrirDoZero();
+      final categoria = find.text('Alimentação');
+      if (categoria.evaluate().isEmpty) {
+        debugPrint('### categoria "Alimentação" nao encontrada');
+        return;
+      }
+      await tester.tap(categoria.first);
+      final pertoDeMim = find.descendant(
+        of: find.byType(TelaSubcategorias),
+        matching: find.text('Perto de mim'),
+      );
+      await capturar('06-especialidades', provas: [pertoDeMim]);
+      if (pertoDeMim.evaluate().isEmpty) {
+        debugPrint('### botao "Perto de mim" nao apareceu');
+        return;
+      }
+
+      await tester.tap(pertoDeMim);
+      final lojasDaLista = find.descendant(
+        of: find.byType(TelaComercios),
+        matching: find.byType(ListTile),
+      );
+      // A distancia so aparece com a posicao do morador e a coordenada da
+      // loja: e a prova de que o "perto de mim" funcionou.
+      await capturar(
+        '03-perto-de-mim',
+        provas: [lojasDaLista, find.byType(SeloDistancia)],
+      );
+      if (lojasDaLista.evaluate().isEmpty) return;
+
+      // Detalhes da loja mais perto, que tem coordenada (por isso o "Como
+      // chegar" e a prova).
+      await tester.tap(lojasDaLista.first);
+      await capturar(
+        '05-detalhes',
+        provas: [find.byType(TelaDetalhes), find.text('Como chegar')],
+        esperaExtraDecimos: 40,
+      );
+      await tester.pageBack();
+      await respirar(tester, decimos: 10);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(TelaComercios),
+          matching: find.text('Aberto agora'),
+        ),
+      );
+      await capturar('04-aberto-agora', provas: [lojasDaLista]);
+    });
+
+    // ---------------------------------------------------------------- 4
+    // Busca por texto. O termo vai sem acento de proposito: a captura
+    // mostra que "acai" encontra "Acai".
+    await grupo('busca', () async {
+      await abrirDoZero();
+      await buscar('acai');
+      await capturar('07-busca', provas: [resultadoDaBusca]);
+    });
+
+    // ---------------------------------------------------------------- 5
     // Favoritos: guarda uma loja e mostra a lista guardada.
     await grupo('favoritos', () async {
       await abrirDoZero();
@@ -254,7 +331,7 @@ void main() {
       }
       await tester.tap(botaoFavoritos);
       await capturar(
-        '05-favoritos',
+        '08-favoritos',
         provas: [
           find.descendant(
             of: find.byType(TelaFavoritos),
@@ -264,29 +341,7 @@ void main() {
       );
     });
 
-    // ---------------------------------------------------------------- 4
-    // Navegacao por categoria: as especialidades de Alimentacao.
-    await grupo('especialidades', () async {
-      await abrirDoZero();
-      final categoria = find.text('Alimentação');
-      if (categoria.evaluate().isEmpty) {
-        debugPrint('### categoria "Alimentação" nao encontrada');
-        return;
-      }
-      await tester.tap(categoria.first);
-      // Com subcategorias no banco abre TelaSubcategorias; sem, cai direto
-      // na lista de comercios. Qualquer uma das duas e a tela certa.
-      await capturar(
-        '06-especialidades',
-        provas: [
-          find.byWidgetPredicate(
-            (w) => w is TelaSubcategorias || w is TelaComercios,
-          ),
-        ],
-      );
-    });
-
-    // ---------------------------------------------------------------- 5
+    // ---------------------------------------------------------------- 6
     // Utilidades/Emergencias: telefones uteis agrupados por secao.
     await grupo('utilidades/emergencias', () async {
       await abrirDoZero();
@@ -297,7 +352,7 @@ void main() {
       }
       await tester.tap(botao);
       await capturar(
-        '07-utilidades-emergencias',
+        '09-utilidades-emergencias',
         provas: [
           find.descendant(
             of: find.byType(TelaEmergencia),
@@ -307,7 +362,7 @@ void main() {
       );
     });
 
-    // ---------------------------------------------------------------- 6
+    // ---------------------------------------------------------------- 7
     // Avisos Comunitarios: o mural do bairro, agrupado por secao.
     await grupo('avisos comunitarios', () async {
       await abrirDoZero();
@@ -318,7 +373,7 @@ void main() {
       }
       await tester.tap(botao);
       await capturar(
-        '08-avisos-comunitarios',
+        '10-avisos-comunitarios',
         provas: [
           // Os cartoes de aviso usam o icone de megafone; procurar dentro da
           // TelaAvisos garante que nao e o botao da tela inicial por baixo.

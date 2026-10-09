@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'coordenadas.dart';
+import 'horario.dart';
 import 'localizacao.dart';
 import 'loja.dart';
 import 'main.dart' show TelaDetalhes;
@@ -179,7 +180,7 @@ class _TelaMapaState extends State<TelaMapa> {
   }
 
   Widget _conteudo(List<LojaInfo> todas) {
-    final agora = DateTime.now();
+    final agora = agoraNoBairro();
     final comLugar = todas.where((l) => l.coordenada != null).toList();
     final visiveis = _soAbertos
         ? comLugar.where((l) => l.abertaEm(agora)).toList()

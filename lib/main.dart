@@ -1068,7 +1068,7 @@ class _TelaComerciosState extends State<TelaComercios> {
           });
           _lojasNaTela = lojas;
 
-          final agora = DateTime.now();
+          final agora = agoraNoBairro();
           final visiveis = _soAbertos
               ? lojas.where((l) => l.abertaEm(agora)).toList()
               : lojas;
@@ -1409,7 +1409,7 @@ class _TelaDetalhesState extends State<TelaDetalhes> {
   // Horário da semana, com o selo de aberto/fechado e o dia de hoje em negrito.
   Widget _blocoHorario(LojaInfo loja) {
     final horario = loja.horario;
-    final agora = DateTime.now();
+    final agora = agoraNoBairro();
     final hoje = agora.weekday - 1;
 
     return Padding(
