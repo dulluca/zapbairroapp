@@ -28,7 +28,7 @@ jobs:
   capturas:
     name: Gerar capturas no Simulador
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 75
 
     steps:
       - name: Checkout
@@ -180,17 +180,19 @@ jobs:
             --batteryState charged \
             --batteryLevel 100 || true
 
-          # O morador das capturas fica no centro do bairro, e a localizacao
-          # ja vem liberada para o app (que ainda nem foi instalado): o alerta
-          # de permissao do iOS nunca aparece, nem na foto.
+          # O morador das capturas fica no centro do bairro. A permissao de
+          # localizacao NAO e concedida aqui: o `simctl privacy grant` falha
+          # quando o app ainda nao esta instalado (o erro sumia no `|| true`),
+          # e o run de 2026-10-09 saiu com o alerta do iOS em 9 das 10 fotos.
+          # Ela e concedida no passo seguinte, depois de instalar o app.
           xcrun simctl location "$udid" set "$LOCALIZACAO_SIMULADA" || true
-          xcrun simctl privacy "$udid" grant location "$IOS_BUNDLE_ID" || true
 
       - name: Gerar as capturas
-        # 35min: cabe o pior caso das duas tentativas do drive (cao de guarda
-        # de 15min cada) mais o teste em si. O que passar disso e travamento,
+        # 45min: cabe o build previo (que instala o app para liberar a
+        # localizacao), o pior caso das duas tentativas do drive (cao de guarda
+        # de 15min cada) e o teste em si. O que passar disso e travamento,
         # e os logs sobem no passo seguinte de qualquer jeito.
-        timeout-minutes: 35
+        timeout-minutes: 45
         run: |
           set -euo pipefail
 
@@ -203,6 +205,33 @@ jobs:
           flutter config --enable-swift-package-manager
 
           mkdir -p logs
+
+          # Permissao de localizacao com o app JA INSTALADO e ainda fechado.
+          # O `simctl privacy grant` precisa do app no simulador; conceder com
+          # o app aberto pode encerra-lo. Entao: compila o mesmo alvo do
+          # drive, instala, concede e so depois o drive abre o app (ele
+          # recompila em cima do cache e reinstala como atualizacao, que
+          # preserva a permissao). Se mesmo assim ela faltar, o teste pede de
+          # novo com ###PERMISSAO (tratado no laco do drive, abaixo).
+          liberar_localizacao() {
+            xcrun simctl location "$SIMULADOR_UDID" set "$LOCALIZACAO_SIMULADA" || true
+            if xcrun simctl privacy "$SIMULADOR_UDID" grant location "$IOS_BUNDLE_ID" 2>&1; then
+              echo ">>> localizacao liberada para $IOS_BUNDLE_ID"
+            else
+              echo "::warning::simctl privacy grant location falhou (app instalado?)"
+            fi
+          }
+          if flutter build ios --simulator --debug \
+               --target=integration_test/capturas_test.dart 2>&1 | tee logs/build-previo.log; then
+            app_previo=build/ios/iphonesimulator/Runner.app
+            if [ -d "$app_previo" ] && xcrun simctl install "$SIMULADOR_UDID" "$app_previo"; then
+              liberar_localizacao
+            else
+              echo "::warning::nao consegui instalar o app antes do drive; a permissao fica para o ###PERMISSAO."
+            fi
+          else
+            echo "::warning::build previo falhou; a permissao fica para o ###PERMISSAO."
+          fi
 
           # O log do proprio simulador, em segundo plano. Se o app crashar ao
           # abrir, o `flutter drive` nao reclama: ele fica esperando para
@@ -235,6 +264,16 @@ jobs:
                 -d "$SIMULADOR_UDID" 2>&1 | while IFS= read -r linha; do
                   printf '%s\n' "$linha"
                   case "$linha" in
+                    *'###PERMISSAO:'*)
+                      # O teste abriu e viu a localizacao negada: concede agora
+                      # e confirma pelo mesmo arquivo-sinal das capturas.
+                      liberar_localizacao
+                      CONTAINER_APP=${CONTAINER_APP:-$(xcrun simctl get_app_container "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" data 2>/dev/null || true)}
+                      if [ -n "${CONTAINER_APP:-}" ]; then
+                        mkdir -p "$CONTAINER_APP/Documents"
+                        : > "$CONTAINER_APP/Documents/permissao_localizacao_confirmada"
+                      fi
+                      ;;
                     *'###CAPTURA:'*)
                       nome=${linha##*###CAPTURA:}
                       nome=$(printf '%s' "$nome" | tr -d '\r' | awk '{print $1}')
@@ -279,7 +318,8 @@ jobs:
             # teste (ele seguiria em frente antes da foto). Fora com elas.
             container_velho=$(xcrun simctl get_app_container "$SIMULADOR_UDID" "$IOS_BUNDLE_ID" data 2>/dev/null || true)
             if [ -n "$container_velho" ]; then
-              rm -f "$container_velho"/Documents/captura_confirmada_* 2>/dev/null || true
+              rm -f "$container_velho"/Documents/captura_confirmada_* \
+                    "$container_velho"/Documents/permissao_localizacao_confirmada 2>/dev/null || true
             fi
 
             rodar_drive &

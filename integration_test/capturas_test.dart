@@ -46,11 +46,15 @@
 // detalhes cabem inteiros (avaliacoes e botao incluidos) e a foto saia
 // identica a dos detalhes.
 //
-// 5. Versao 1.1 (mapa, perto de mim, aberto agora): o workflow concede a
-//    permissao de localizacao antes de o app abrir, poe o simulador no centro
-//    do Conjunto Maguari e o relogio no fuso de Belem. Sem isso o alerta de
-//    permissao do iOS sairia na foto e o "aberto agora" seguiria o UTC do
-//    runner. As capturas do mapa esperam alguns segundos a mais: os blocos do
+// 5. Versao 1.1 (mapa, perto de mim, aberto agora): o workflow instala o app,
+//    concede a permissao de localizacao antes de abri-lo, poe o simulador no
+//    centro do Conjunto Maguari e o relogio no fuso de Belem. Sem isso o
+//    alerta de permissao do iOS sai na foto e fica por cima de TODAS as telas
+//    seguintes (run de 2026-10-09: 9 de 10 capturas com o alerta, e a 03 nem
+//    saiu, porque sem posicao nao ha distancia) e o "aberto agora" segue o UTC
+//    do runner. Ao abrir, o teste confere a permissao; se ainda estiver
+//    negada, pede ao host com "###PERMISSAO:" e espera a confirmacao, do mesmo
+//    jeito que as capturas. As capturas do mapa esperam alguns segundos a mais: os blocos do
 //    Google Maps chegam pela rede e nao ha widget Flutter que prove que
 //    terminaram de desenhar.
 import 'dart:io';
@@ -58,6 +62,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:zapbairro/loja.dart';
@@ -187,6 +192,31 @@ void main() {
       }
     }
 
+    // A localizacao tem de estar liberada ANTES de o app pedir (o mapa e a
+    // primeira lista de categoria pedem). O workflow ja concedeu com o app
+    // instalado e fechado; aqui so conferimos e, se faltar, pedimos ao host.
+    Future<void> garantirLocalizacao() async {
+      bool liberada(LocationPermission p) =>
+          p == LocationPermission.whileInUse || p == LocationPermission.always;
+      var permissao = await Geolocator.checkPermission();
+      debugPrint('### permissao de localizacao ao abrir: $permissao');
+      if (liberada(permissao)) return;
+
+      final confirmacao = File(
+        '${Platform.environment['HOME']}/Documents/permissao_localizacao_confirmada',
+      );
+      debugPrint('###PERMISSAO:localizacao');
+      await esperarAte(tester, confirmacao.existsSync);
+      permissao = await Geolocator.checkPermission();
+      debugPrint('### permissao de localizacao depois do host: $permissao');
+      if (!liberada(permissao)) {
+        debugPrint(
+          '### ATENCAO: localizacao continua negada; o alerta do iOS vai '
+          'aparecer nas capturas do mapa em diante',
+        );
+      }
+    }
+
     // Digita o termo na busca da tela inicial e abre a lista de resultados.
     Future<void> buscar(String termo) async {
       await tester.enterText(find.byType(TextField).first, termo);
@@ -207,6 +237,7 @@ void main() {
     // Tela inicial: acoes, busca, o cartao do mapa e a grade de categorias.
     await grupo('inicio', () async {
       await abrirDoZero();
+      await garantirLocalizacao();
       await capturar(
         '01-inicio',
         provas: [find.text('Explore por Categorias'), find.text('Mapa do bairro')],
