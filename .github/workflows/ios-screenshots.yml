@@ -19,7 +19,7 @@ on:
 
 env:
   IOS_BUNDLE_ID: com.zapbairro.zapbairro
-  FLUTTER_VERSION: 3.44.4
+  FLUTTER_VERSION: 3.47.6
 
 jobs:
   capturas:

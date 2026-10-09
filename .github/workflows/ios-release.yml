@@ -33,7 +33,7 @@ concurrency:
 
 env:
   IOS_BUNDLE_ID: com.zapbairro.zapbairro
-  FLUTTER_VERSION: 3.44.4
+  FLUTTER_VERSION: 3.47.6
   FASTLANE_SKIP_UPDATE_CHECK: "true"
   FASTLANE_HIDE_CHANGELOG: "true"
   # Caminhos absolutos: o fastlane resolve caminho relativo a partir de `ios/`,
