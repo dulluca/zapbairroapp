@@ -1,4 +1,5 @@
 import Flutter
+import GoogleMaps
 import UIKit
 
 @main
@@ -7,6 +8,8 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Chave do Google Maps (projeto Firebase do ZapBairro). Ver docs/MAPA_GOOGLE.md
+    GMSServices.provideAPIKey("AIzaSyDRjjo7jZHMJN37TZ-LoQYpYgS-OvMt3M8")
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

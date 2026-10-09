@@ -57,3 +57,6 @@ ios/fastlane/profiles/
 ios/fastlane/report.xml
 ios/fastlane/README.md
 ios/fastlane/test_output/
+
+# Copias do Firestore feitas pelo importar.dart antes de regravar
+/backups/
