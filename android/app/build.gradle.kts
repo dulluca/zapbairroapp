@@ -24,8 +24,11 @@ android {
         applicationId = "com.zapbairro.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 7
-        versionName = "6"
+        // Vem do pubspec.yaml (version: 1.1.0+8 -> versionName 1.1.0,
+        // versionCode 8). Fixo aqui, o numero do pubspec era ignorado e a
+        // Play Store recusava o pacote por codigo de versao repetido.
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     // Novo DSL para Kotlin
