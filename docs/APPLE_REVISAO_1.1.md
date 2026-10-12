@@ -1,4 +1,4 @@
-# App Store — envio da versão 1.1.0 (build 9)
+# App Store — envio da versão 1.1.0 (build 10)
 
 Versão que responde à diretriz **4.2.2 (Minimum Functionality)** com três
 recursos nativos: mapa do bairro, "perto de mim" e "aberto agora". As
@@ -14,8 +14,8 @@ corrija a carta.
 
 ## 1. Passo a passo
 
-1. **Build 9 no GitHub Actions.** Actions → "iOS - Build IPA (App Store)" →
-   Run workflow na `main`, com os campos vazios (versão 1.1.0 e build 9 saem do
+1. **Build 10 no GitHub Actions.** Actions → "iOS - Build IPA (App Store)" →
+   Run workflow na `main`, com os campos vazios (versão 1.1.0 e build 10 saem do
    `pubspec.yaml`). A build 8 gerada antes não tem a correção do fuso do
    "aberto agora" (seção 5): não envie a 8.
 2. **Capturas.** Actions → "iOS - Capturas de tela (App Store)" → Run
@@ -26,7 +26,7 @@ corrija a carta.
 3. **App Store Connect → ZapBairro → iOS.** Se a versão rejeitada (1.0.0)
    ainda estiver aberta, troque o número dela para **1.1.0** (o app nunca foi
    publicado, então dá para editar); senão, crie a versão 1.1.0 pelo "+".
-4. **Build:** na seção "Build", remova a antiga e escolha a **1.1.0 (9)**
+4. **Build:** na seção "Build", remova a antiga e escolha a **1.1.0 (10)**
    quando ela aparecer (o processamento leva de 10 a 30 min depois do upload).
 5. **Capturas:** em "Pré-visualizações e capturas de tela", apague **todas** as
    antigas (inclusive em "Ver todos os tamanhos no Gerenciador de Mídia") e
@@ -101,7 +101,7 @@ Hello,
 
 Thank you for the review of build 1.0.0 (7) on September 2. We took the
 Guideline 4.2.2 feedback as a product problem, not a wording problem, and
-rebuilt the app around what a web page cannot do: location. Build 1.1.0 (9)
+rebuilt the app around what a web page cannot do: location. Build 1.1.0 (10)
 adds three native, interactive features, each with a one-minute test below.
 
 What ZapBairro is: a free guide to the small businesses of Conjunto Maguari and
@@ -109,7 +109,7 @@ nearby areas in Belem, Brazil - 157 local businesses in 12 categories, many of
 them without a website and absent from map and delivery apps. The app sells
 nothing, shows no ads and requires no account.
 
-NEW IN BUILD 1.1.0 (9)
+NEW IN BUILD 1.1.0 (10)
 
 1. NEIGHBORHOOD MAP
    On the first screen, tap "Mapa do bairro". A native map shows the 150
@@ -159,7 +159,7 @@ Thank you for your time. We are happy to provide any further detail.
 ### 3.2 Notas para a revisão (campo da versão)
 
 ```
-Build 1.1.0 (9) adds three native, location-based features (guideline 4.2.2):
+Build 1.1.0 (10) adds three native, location-based features (guideline 4.2.2):
 
 1. Neighborhood map: first screen > "Mapa do bairro". Pins colored by open/closed
    status, your position, tap a pin > "Como chegar" opens Apple Maps directions.
@@ -207,10 +207,17 @@ de privacidade do Google Maps SDK for iOS 9.4.0
 
 ---
 
-## 5. Por que a build 9 e não a 8
+## 5. Por que a build 10 (e não a 8 nem a 9)
+
+A 9 subiu com o aviso **ITMS-90683** ("Missing purpose string"): o pacote
+`geolocator` tem código da permissão "sempre", mesmo que o app só peça "durante
+o uso", e a Apple exige a frase `NSLocationAlwaysAndWhenInUseUsageDescription`
+no Info.plist. A 10 tem a frase. O aviso não bloqueia, mas não vale arriscar.
+
+### Por que não a 8
 
 A 8 calculava o "aberto agora" pelo relógio do celular. Para quem está em
 Belém dá no mesmo, mas o revisor costuma estar nos EUA: às 21h dele (1h em
-Belém) uma loja que fecha às 22h apareceria aberta. Na 9 o cálculo usa sempre a
+Belém) uma loja que fecha às 22h apareceria aberta. Desde a 9 o cálculo usa sempre a
 hora de Belém (`agoraNoBairro()` em `lib/horario.dart`, com teste). A Play
 Store recebeu a 8; a próxima atualização Android já sai com a correção.
