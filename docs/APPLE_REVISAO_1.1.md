@@ -94,60 +94,66 @@ Mapa do bairro, lojas perto de você com a distância, selo e filtro "Aberto ago
 
 ## 3. Texto para a revisão (inglês)
 
-### 3.1 Resposta ao revisor (até 4.000 caracteres; este tem ~2.500)
+### 3.1 Resposta ao revisor (na conversa da submissão 438c4949; até 4.000 caracteres, este tem 2986)
 
 ```
 Hello,
 
-Thank you for your patience. Build 1.1.0 (9) answers guideline 4.2.2 with three
-native, location-based features. The earlier fixes remain in place: no
-registration, no login, no personal data, and screenshots taken on an iPhone
-simulator.
+Thank you for the review of build 1.0.0 (7) on September 2. We took the
+Guideline 4.2.2 feedback as a product problem, not a wording problem, and
+rebuilt the app around what a web page cannot do: location. Build 1.1.0 (9)
+adds three native, interactive features, each with a one-minute test below.
 
-ZapBairro is the neighborhood guide of Conjunto Maguari and nearby areas in
-Belem, Brazil: 157 small businesses in 12 categories, most of them without a
-website and absent from map and delivery apps.
+What ZapBairro is: a free guide to the small businesses of Conjunto Maguari and
+nearby areas in Belem, Brazil - 157 local businesses in 12 categories, many of
+them without a website and absent from map and delivery apps. The app sells
+nothing, shows no ads and requires no account.
 
-NEW IN THIS BUILD
+NEW IN BUILD 1.1.0 (9)
 
-1. NEIGHBORHOOD MAP. On the first screen, tap "Mapa do bairro". A native map
-   shows the 150 businesses that have a location, colored by whether they are
-   open right now (green open, red closed, blue hours not informed), plus your
-   position. Tap a pin for a card with the status and distance, then "Ver loja"
-   (details) or "Como chegar" (directions in Apple Maps). The "Aberto agora"
-   chip filters the map to the businesses open now.
+1. NEIGHBORHOOD MAP
+   On the first screen, tap "Mapa do bairro". A native map shows the 150
+   businesses that have a location, colored by whether they are open right
+   now (green open, red closed, blue hours not informed), plus your position.
+   Tap a pin: a card shows the status and the distance, with "Ver loja"
+   (details) and "Como chegar" (directions in Apple Maps). The "Aberto agora"
+   chip keeps only the businesses that are open now.
 
-2. NEAR ME. Tap a category, for example "Alimentacao", then "Perto de mim". The
+2. NEAR ME
+   Tap a category, for example "Alimentacao", then "Perto de mim". The
    businesses are listed from nearest to farthest, each with its distance.
-   Location permission is requested the first time a list or the map is
-   opened, with a purpose string, and the location never leaves the device: it
-   is used only to compute distances and is neither stored nor sent. Without
-   permission the app keeps working with the regular list.
+   Location permission is requested the first time a business list or the
+   map is opened, with a purpose string, and the location never leaves the
+   device: it is used only to compute distances and is neither stored nor
+   sent. Without permission the app keeps working with the regular list.
 
-3. OPEN NOW. Every business shows a live status computed from its weekly
-   schedule ("Aberto - fecha as 18h", "Fechado - abre amanha as 8h"), each list
-   has an "Aberto agora" filter, and the detail screen shows the whole week with
-   today in bold, a small map and the "Como chegar" button. The status follows
-   the neighborhood's local time (Belem, UTC-3), so it is correct from any time
-   zone.
+3. OPEN NOW
+   Every business shows a live status computed from its weekly hours
+   ("Aberto - fecha as 18h", "Fechado - abre amanha as 8h"). The business
+   lists and the map have an "Aberto agora" filter, and the detail screen
+   shows the whole week with today in bold, a small map and "Como chegar".
+   The status follows the neighborhood's local time (Belem, UTC-3), so it is
+   correct from any time zone.
 
-TESTING FROM OUTSIDE BRAZIL
+TESTING NOTES
+- Outside Brazil, distances read in thousands of kilometers and the map opens
+  framing the neighborhood instead of your position. To see the app as a
+  resident does, set the device or simulator location to -1.33186, -48.44317.
+- The last review ran on an iPad Air. ZapBairro is an iPhone-only app; on iPad
+  it runs in iPhone compatibility mode, and every feature above works there.
 
-Distances from your location will read in thousands of kilometers, and the map
-opens framing the neighborhood instead of your position. To see it as a
-resident does, set the simulator location to -1.33186, -48.44317 (Features >
-Location > Custom Location).
+The earlier features remain: accent-insensitive search, community star
+ratings with no account, favorites, the neighborhood's emergency numbers and
+its community notice board. The screenshots were replaced with captures of
+this build, taken on an iPhone simulator, showing the map, the near-me list
+and the open-now filter.
 
-The previous features are still there: accent-insensitive search, community
-star ratings with no account, favorites, emergency phone numbers and community
-notices.
+Hidden publisher panel (guideline 2.3.1), disclosed as before: on the first
+screen, press and hold the "ZapBairro" title for about one second; the
+password is zapadmin2024. It shows visit counts and ratings to us, the
+publisher, and has no user-facing feature.
 
-Hidden admin panel (guideline 2.3.1), disclosed as before: on the first screen,
-press and hold the title "ZapBairro" for about one second and enter the
-password zapadmin2024. It shows visit counts and ratings to us, the publisher,
-and has no user-facing feature.
-
-Thank you for your time.
+Thank you for your time. We are happy to provide any further detail.
 ```
 
 ### 3.2 Notas para a revisão (campo da versão)
